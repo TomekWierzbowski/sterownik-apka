@@ -467,6 +467,14 @@
     M.tryb = 'mqtt';
     const Klient = window.Paho && (Paho.Client || (Paho.MQTT && Paho.MQTT.Client));
     if (!Klient) { podaj({ polaczony: false, swiat: null, wiek_s: null, blad: 'brak biblioteki MQTT (cdnjs)' }); return; }
+    /*  KONTO OBIEKTU WIDZI TYLKO SWÓJ OBIEKT [D-306, Tomasz 2026-09-11 00:05: „rozumiem, że ten link prowadzi do
+        sadzawki albo basenu"]. Użytkownik brokera = slug nazwy sterownika („Gliczarów wanna" → gliczarow-wanna);
+        temat obiektu = 'basen/' + slug z PIERWSZYM myślnikiem zamienionym na '/' → 'basen/gliczarow/wanna' - taki sam
+        prefiks wpisuje się w sterowniku (serwis → sieć). Konto bez myślnika (serwisowe: „sterownik") widzi wszystko.
+        To filtr po stronie apki; twarde odcięcie tematów per konto da dopiero ACL na własnym Mosquitto. */
+    if (!o.temat) { const u = String(o.user || ''); const i = u.indexOf('-');
+      if (i > 0) { o.temat = 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1); if (!o.obiekt) o.obiekt = o.temat; }
+      else o.temat = 'basen/+/+'; }
     /*  KOMENDY PRZEZ BROKER [D-267, Tomasz: „apka nie musi mieć uprawnień, bo
         serwis za PIN-em, a reszta dla klienta"]. fetch('/cmd?co=…') z makiety
         tłumaczymy jak dla AP (komendaNaZapisy → lista zapisów rejestrów) i
