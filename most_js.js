@@ -592,7 +592,9 @@
     const zdarzenia = {};               /* prefiks -> {ile, zgubione, wpisy[[czas,kat,kod,zr,ob,a,b,c]]} [D-295] */
     let czekaPliki = null, czekaPlik = null, czekaOkres = null;   /* prośby o listę / plik / okres z karty SD [D-297/298] */
     let prosZdOst = 0;
-    M.prosZdarzenia = () => { const t = Date.now(); if (t - prosZdOst < 15000) return; prosZdOst = t; oglos('zdarzenia'); };
+    /* prośba o pamięć zdarzeń (RAM sterownika); przed połączeniem NIE liczy się jako próba - inaczej wstępne wczytanie
+       ze startu apki (D-308) przepadało i dziennik czekał 15 s na kolejną */
+    M.prosZdarzenia = () => { if (!wybrany || !k || !k.isConnected()) return; const t = Date.now(); if (t - prosZdOst < 15000) return; prosZdOst = t; oglos('zdarzenia'); };
     /*  STAN BROKERA I WYDAWCÓW NA PASKU [Tomasz 2026-09-09: „apka powinna mieć na górze
         status połączenia z brokerem i status wydawców"]. Trzy rzeczy, trzy źródła:
         - broker: zdarzenia własnego klienta (łączę / połączony / odmowa / zerwane);

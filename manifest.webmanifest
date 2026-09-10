@@ -1,7 +1,7 @@
 {
  "name": "Sterownik basenowy",
  "short_name": "Basen HMI",
- "description": "HMI sterownika basenowego 1:1 przez chmurę: temperatura, grzanie, światło, atrakcje; serwis za PIN-em.",
+ "description": "HMI sterownika basenowego 1:1: temperatura, grzanie, światło, atrakcje; serwis za PIN-em.",
  "start_url": "./index.html",
  "scope": "./",
  "display": "standalone",

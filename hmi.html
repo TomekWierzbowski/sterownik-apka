@@ -1111,7 +1111,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '9b87f7c06f';
+window.APKA_WERSJA = 'dbc030dd26';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1602,7 +1602,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-11 00:47';
+window.HMI_ZBUDOWANO = '2026-09-11 01:11';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5786,6 +5786,10 @@ window.HMI_ZBUDOWANO = '2026-09-11 00:47';
       const KOL = { ok: '#7be58a', czekam: '#ffd166', zle: '#ff8a80' };
       /* tekst przy kropce w osobnym <i class=chm-t>: apka w trybie jednej linijki chowa tekst, zostaje kropka [D-304] */
       const kropka = (kol, txt) => '<span style="color:' + kol + '">&#9679;<i class="chm-t" style="font-style:normal"> ' + txt + '</i></span>';
+      /* ETYKIETA + KROPKA [D-308, Tomasz 2026-09-11: „poł. sterownika - kropka ziel/czer, poł. brokera - kropka"]:
+         w apce (jedna linijka) widać „sterownik ●  broker ●", szczegóły (.chm-t) po rozwinięciu paska */
+      const kropkaEt = (et, kol, txt) => '<span class="chm-e">' + et + ' </span><span style="color:' + kol + '">&#9679;</span><i class="chm-t" style="font-style:normal"> ' + txt + '</i>';
+      const nazwaInst = (z && z.nazwa) || '';   /* nazwa sterownika/instalacji z logowania (D-304) */
       let mialDane = false, mamNumery = false; const t0Chmury = Date.now();
       const podajChmura = d => {
         /* powód dla wpisu alarmu na ekranie (zasada 10): broker czy sterownik */
@@ -5802,10 +5806,13 @@ window.HMI_ZBUDOWANO = '2026-09-11 00:47';
              Wcześniej cały innerHTML paska był przepisywany przy KAŻDYM pakiecie (co ~1 s),
              więc <select> był odtwarzany i jego rozwinięta lista natychmiast się zamykała.
              Teraz select i teksty statusu to trwałe węzły; aktualizujemy tylko ich zawartość. */
-          p.innerHTML = '<b id="chmura-tyt" style="cursor:pointer" title="dziennik zdarzeń">PRZEZ CHMURĘ</b>'
+          /* UKŁAD PASKA [D-308]: sterownik ● | broker ● | nazwa instalacji (konto jednego obiektu) albo wybór obiektu
+             (konto serwisowe). Tytuł „PRZEZ CHMURĘ" zdjęty [Tomasz 2026-09-11: „tekst przez chmurę wykasuj"];
+             dziennik łącza otwiera się linkiem widocznym po rozwinięciu paska. */
+          p.innerHTML = '<span id="chmura-st"></span>'
             + '<span id="chmura-br"></span>'
-            + '<span><i class="chm-t" style="font-style:normal">obiekt: </i><select id="chmura-sel" style="font:inherit" onchange="window.MOST_JS.wybierzObiekt(this.value)"></select></span>'
-            + '<span id="chmura-st"></span>'
+            + '<span id="chmura-ob"><b id="chmura-naz" style="font-weight:600"></b><i class="chm-t" style="font-style:normal">obiekt: </i><select id="chmura-sel" style="font:inherit" onchange="window.MOST_JS.wybierzObiekt(this.value)"></select></span>'
+            + '<b id="chmura-tyt" class="chm-t" style="cursor:pointer;font-weight:500;color:#9fd3ff" title="dziennik łącza">dziennik łącza</b>'
             + (_pwa ? '<a href="index.html?login=1" style="color:#9fd3ff;margin-left:auto">logowanie</a>' : '')
             + '<span id="chmura-w" style="flex-basis:100%;font-size:10px;color:#98a0ad"></span>'
             + '<pre id="chmura-dz" style="display:none;flex-basis:100%;margin:0;max-height:40vh;overflow:auto;font:10px/1.35 ui-monospace,monospace;color:#d0d4da;white-space:pre-wrap"></pre>';
@@ -5842,9 +5849,7 @@ window.HMI_ZBUDOWANO = '2026-09-11 00:47';
         const wyd = d.wydawcy || {};
         /* BROKER */
         const ebr = document.getElementById('chmura-br');
-        if (ebr) ebr.innerHTML = br.stan === 'ok' ? kropka(KOL.ok, 'broker: ' + br.opis)
-                               : br.stan === 'laczy' ? kropka(KOL.czekam, 'broker: ' + br.opis)
-                               : kropka(KOL.zle, 'broker: ' + br.opis);
+        if (ebr) ebr.innerHTML = kropkaEt('broker', br.stan === 'ok' ? KOL.ok : br.stan === 'laczy' ? KOL.czekam : KOL.zle, br.opis);
         /* SELECT: przebuduj opcje tylko gdy zmienił się zestaw obiektów / ich status i użytkownik
            właśnie nie wybiera (inaczej znów gasłoby rozwinięcie). */
         const sel = document.getElementById('chmura-sel');
@@ -5858,16 +5863,29 @@ window.HMI_ZBUDOWANO = '2026-09-11 00:47';
             : '<option>czekam…</option>';
           if (d.obiekt) sel.value = d.obiekt;
         }
+        /* NAZWA INSTALACJI zamiast wyboru, gdy konto widzi jeden obiekt [D-308: „i nazwa sterownika/instalacji"] */
+        const naz = document.getElementById('chmura-naz');
+        if (naz && sel) {
+          const jeden = obs.length <= 1;
+          naz.textContent = jeden ? (nazwaInst || (d.obiekt ? d.obiekt.split('/').slice(1).join(' / ') : '')) : '';
+          naz.style.display = jeden ? '' : 'none';
+          sel.style.display = jeden ? 'none' : '';
+          if (naz.nextElementSibling) naz.nextElementSibling.style.display = jeden ? 'none' : '';
+        }
         /* WYDAWCA + ŚWIEŻOŚĆ wybranego obiektu */
         const w = d.obiekt ? (wyd[d.obiekt] || {}) : {};
         const stn = document.getElementById('chmura-st');
-        let wydTxt;
-        if (!d.obiekt) wydTxt = kropka(KOL.czekam, 'czekam na listę obiektów…');
-        else if (w.status === 'offline') wydTxt = kropka(KOL.zle, 'sterownik offline');
-        else if (w.status === 'online') wydTxt = kropka(KOL.ok, 'sterownik online');
-        else wydTxt = kropka(KOL.czekam, 'sterownik: stan nieznany');
-        if (stn) stn.innerHTML = wydTxt + ' · ' + (d.polaczony ? 'pakiet ' + Math.round(d.wiek_s || 0) + ' s temu'
-                 : (w.wiek_s != null ? '<span style="color:' + KOL.zle + '">ostatni pakiet ' + Math.round(w.wiek_s) + ' s temu</span>' : 'czekam na pakiet…'));
+        /* KROPKA STEROWNIKA [D-308]: zielona = online I pakiety płyną; czerwona = offline (testament) albo online bez
+           pakietów, gdy już mieliśmy dane; bursztyn = jeszcze czekamy. Szczegóły w tekście po rozwinięciu. */
+        let kolS, opisS;
+        if (!d.obiekt) { kolS = KOL.czekam; opisS = 'czekam na listę obiektów…'; }
+        else if (w.status === 'offline') { kolS = KOL.zle; opisS = 'offline (broker dostał testament)'; }
+        else if (w.status === 'online') {
+          if (d.polaczony) { kolS = KOL.ok; opisS = 'online · pakiet ' + Math.round(d.wiek_s || 0) + ' s temu'; }
+          else { kolS = mialDane ? KOL.zle : KOL.czekam;
+                 opisS = w.wiek_s != null ? 'online, ale ostatni pakiet ' + Math.round(w.wiek_s) + ' s temu' : 'online · czekam na pakiet…'; }
+        } else { kolS = KOL.czekam; opisS = 'stan nieznany' + (w.wiek_s != null ? ' · ostatni pakiet ' + Math.round(w.wiek_s) + ' s temu' : ''); }
+        if (stn) stn.innerHTML = kropkaEt('sterownik', kolS, opisS);
         /* PLANSZA TYLKO DO PIERWSZEGO PAKIETU [Tomasz 2026-09-09, 14:30: „raz na czas pokazuje się
            brak połączenia i znika HMI"]. Pierwsza wersja wracała z planszą przy brokerze straconym
            > 10 s - na telefonie (VPN, 5G, ekran gaśnie) takie przerwy są normalne i zasłanianie
@@ -8682,6 +8700,22 @@ function almNazwaBit(bit){
   return 'alarm nr ' + bit;
 }
 
+/* SKLEJANIE POWTÓRZEŃ ALARMU [D-308, Tomasz 2026-09-11: „kilkukrotny alarm o tym samym, różniący się czasem kilku minut
+   do ew. godzin, powinien być tylko 1 z godziną wystąpienia pierwszego"]. Ten sam bit, kolejne podniesienie w odstępie
+   ≤ ALM_SKLEJ_S od poprzedniego = ten sam epizod (termik odbijający całe popołudnie to jedna usterka, nie dwadzieścia).
+   Wejście: [{bit, czas}] w dowolnej kolejności. Wyjście: epizody od najnowszego, każdy z czasem PIERWSZEGO podniesienia
+   i liczbą powtórzeń (n) - liczba zostaje w podpisie („×5"), bo mówi, że alarm odbijał. Tab5: srv_historia.c robi to samo. */
+const ALM_SKLEJ_S = 6 * 3600;
+function almSklej(lista){
+  const s = lista.slice().sort((a, b) => a.czas - b.czas), otw = {}, wyn = [];
+  for (const w of s){
+    const o = otw[w.bit];
+    if (o && w.czas - o.ost <= ALM_SKLEJ_S){ o.n++; o.ost = w.czas; }
+    else { const e = { bit: w.bit, czas: w.czas, ost: w.czas, n: 1 }; otw[w.bit] = e; wyn.push(e); }
+  }
+  return wyn.sort((a, b) => b.czas - a.czas);
+}
+
 /* KTORE OBIEGI ISTNIEJA — z kontraktu, tak samo jak reszta ekranow.
    Przy jednym obiegu wiersz ma JEDEN ptaszek bez nazwy obiegu: pisanie
    „WANNA" przy kazdej pozycji na panelu, ktory obsluguje tylko wanne,
@@ -9371,16 +9405,37 @@ function kartaPobierz(kat, nazwa) {
 }
 /* OKRES [D-298, Tomasz: „przez MQTT na żądanie z okresu"]: 24 h / 7 dni / od–do z pól daty; wynik pod listą plików */
 const OKRES_UI = { zdarzenia: { od: null, dok: null, linie: null, laduje: false, blad: null, etyk: '' }, alarmy: { od: null, dok: null, linie: null, laduje: false, blad: null, etyk: '' } };
-function kartaOkres(kat, od, dok, etyk) {
-  const u = OKRES_UI[kat]; if (u.laduje) return; u.laduje = true; u.od = od; u.dok = dok; u.etyk = etyk; u.linie = null; u.blad = null; srvRender();
+function kartaOkres(kat, od, dok, etyk, cicho) {
+  /* cicho [D-308]: odświeżenie w tle - stare linie zostają na ekranie do nadejścia nowych, bez „szukam na karcie…" */
+  const u = OKRES_UI[kat]; if (u.laduje) return; u.laduje = true; u.od = od; u.dok = dok; u.etyk = etyk; u.blad = null;
+  if (!cicho) { u.linie = null; srvRender(); }
   fetch('/okres?kat=' + kat + '&od=' + od + '&do=' + dok).then(r => r.json())
-    .then(o => { u.laduje = false; if (o.blad) u.blad = o.blad; else u.linie = (o.linie || []).map(l => l.split(';').map(Number)); srvRender(); })
-    .catch(e => { u.laduje = false; u.blad = String(e); srvRender(); });
+    .then(o => { u.laduje = false; if (o.blad) u.blad = o.blad; else { u.linie = (o.linie || []).map(l => l.split(';').map(Number)); u.kiedy = Date.now(); } if (!cicho || SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia') srvRender(false); })
+    .catch(e => { u.laduje = false; u.blad = String(e); if (!cicho || SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia') srvRender(false); });   /* cicho: nie przerysowuj cudzego ekranu (np. PIN pod palcem) */
 }
-function kartaOkresOstatnie(kat, godzin) {
+function kartaOkresOstatnie(kat, godzin, cicho) {
   /* „teraz" ze zegara sterownika (blok) - telefon może mieć inną strefę; zapas 5 min w przód */
   const teraz = (SRV_S.czasSter || Math.floor(Date.now() / 1000)) + 300;
-  kartaOkres(kat, teraz - godzin * 3600 - 300, teraz, godzin >= 48 ? 'ostatnie ' + Math.round(godzin / 24) + ' dni' : 'ostatnie ' + godzin + ' h');
+  kartaOkres(kat, teraz - godzin * 3600 - 300, teraz, godzin >= 48 ? 'ostatnie ' + Math.round(godzin / 24) + ' dni' : 'ostatnie ' + godzin + ' h', cicho);
+}
+/* DZIENNIK OD STARTU APKI [D-308, Tomasz 2026-09-11: „dziennik zdarzeń powinien być ładowany zaraz po uruchomieniu apki,
+   a nie w momencie wejścia w dziennik"]. Po pierwszym pakiecie z zegarem sterownika pytamy o ostatnie 24 h (karta) i o
+   pamięć od startu (RAM, przez most_js) - ekran otwiera się od razu z tabelą. Potem: nowe zdarzenie w pakiecie (SRV_S.zdarzenia
+   rośnie) = ciche odświeżenie, nie częściej niż co 20 s; bez karty (sadzawka) odpowiedź to błąd i tabela idzie z RAM. */
+let _zdWstepnie = 0;   /* czas ostatniej próby wstępnego wczytania (0 = jeszcze nie) */
+function zdWczytajOdStartu(nowe) {
+  if (!PANEL_LEWY || !SRV_S.czasSter) return;
+  const u = OKRES_UI.zdarzenia;
+  /* ⚠ pierwszy pakiet bywa ZASIEWEM z pamięci telefonu (C4) - broker jeszcze nie połączony, most_js odpowiada
+     „brak połączenia". Wtedy próbujemy ponownie co 3 s, aż odpowie sterownik (linie) albo karta (inny błąd). */
+  const brakLacza = u.blad && /brak połączenia/.test(u.blad);
+  if (!u.linie && !u.laduje && (!_zdWstepnie || (brakLacza && Date.now() - _zdWstepnie > 3000))) {
+    _zdWstepnie = Date.now();
+    if (window.MOST_JS && MOST_JS.prosZdarzenia) MOST_JS.prosZdarzenia();
+    if (!u.blad || brakLacza) kartaOkresOstatnie('zdarzenia', 24, true);
+    return;
+  }
+  if (nowe && zdTryb === '24h' && u.linie && !u.laduje && Date.now() - (u.kiedy || 0) > 20000) kartaOkresOstatnie('zdarzenia', 24, true);
 }
 function kartaOkresPola(kat) {
   const a = document.getElementById('okres-od-' + kat), b = document.getElementById('okres-do-' + kat);
@@ -9396,7 +9451,7 @@ function kartaOkresPobierz(kat) {
   a.href = URL.createObjectURL(b); a.download = kat + '_' + u.etyk.replace(/[^0-9A-Za-z–-]+/g, '_') + '.csv'; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
-function sekcjaOkres(kat, wiersz) {
+function sekcjaOkres(kat, wiersz, przygotuj) {   /* przygotuj(lista) - np. sklejanie epizodów alarmów [D-308] */
   const u = OKRES_UI[kat];
   let s = `<div class="grupka" data-lv="g">Z OKRESU (z karty)</div>
     <div class="nota" data-lv="nota" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -9407,10 +9462,10 @@ function sekcjaOkres(kat, wiersz) {
       ${u.linie ? `<span class="abtn" data-lv="abtn" onclick="kartaOkresPobierz('${kat}')">pobierz CSV</span>` : ''}</div>`;
   if (u.laduje) s += `<div class="nota" data-lv="nota">szukam na karcie…</div>`;
   else if (u.blad) s += `<div class="nota" data-lv="nota">${u.blad}</div>`;
-  else if (u.linie) { const w = u.linie.slice().reverse(); s += (w.length ? w.map(wiersz).join('') : `<div class="nota" data-lv="nota">nic w tym okresie</div>`) + `<div class="nota" data-lv="nota">${u.etyk}: ${w.length} wpisów (najnowsze na górze)</div>`; }
+  else if (u.linie) { const w = przygotuj ? przygotuj(u.linie) : u.linie.slice().reverse(); s += (w.length ? w.map(wiersz).join('') : `<div class="nota" data-lv="nota">nic w tym okresie</div>`) + `<div class="nota" data-lv="nota">${u.etyk}: ${w.length} wpisów (najnowsze na górze)</div>`; }
   return s;
 }
-function sekcjaKarta(kat, wiersz) {
+function sekcjaKarta(kat, wiersz, przygotuj) {
   const u = KARTA_UI[kat];
   if (!u.pliki && !u.laduje && !u.blad) kartaLista(kat);
   const kb = n => (n < 1024 ? n + ' B' : (n / 1024).toFixed(1) + ' kB');
@@ -9426,7 +9481,7 @@ function sekcjaKarta(kat, wiersz) {
   if (u.wybrany) {
     s += `<div class="grupka" data-lv="g">Z PLIKU ${u.wybrany.replace(/^tydz_/, 'TYDZIEŃ OD ').replace(/\.csv$/, '')}</div>`;
     if (u.laduje) s += `<div class="nota" data-lv="nota">wczytuję z karty…</div>`;
-    else if (u.linie) { const w = u.linie.slice().reverse(); s += (w.length ? w.map(wiersz).join('') : `<div class="nota" data-lv="nota">plik pusty</div>`) + `<div class="nota" data-lv="nota">${w.length} wpisów w pliku (najnowsze na górze)</div>`; }
+    else if (u.linie) { const w = przygotuj ? przygotuj(u.linie) : u.linie.slice().reverse(); s += (w.length ? w.map(wiersz).join('') : `<div class="nota" data-lv="nota">plik pusty</div>`) + `<div class="nota" data-lv="nota">${w.length} wpisów w pliku (najnowsze na górze)</div>`; }
   }
   return s;
 }
@@ -9453,7 +9508,7 @@ function ekrZdarzenia(){
   /* stopki z liczbą wpisów i źródłem NIE MA [Tomasz 2026-09-10 23:10: „tego wpisu nie generuj”] - numer w tabeli mówi, ile jest */
   let wiersze = null;
   if (u.linie && !u.blad) wiersze = u.linie.slice().reverse();
-  else if (u.blad && z && z.wpisy) wiersze = z.wpisy.filter(x => zdTryb !== '24h' || x[0] >= teraz - 86400);   /* bez karty: pamięć od startu */
+  else if (z && z.wpisy) wiersze = z.wpisy.filter(x => zdTryb !== '24h' || x[0] >= teraz - 86400);   /* bez karty (albo karta jeszcze nie odpowiedziała): pamięć od startu - tabela nie znika na czas cichego odświeżenia [D-308] */
   const pokaz = wiersze ? wiersze.filter(x => zdKatWl[x[1]]) : null;
   const pasek24 = `<div class="zdpas${zdTryb === '24h' ? ' akt' : ''}" data-lv="c.zdtryb" onclick="zdWybierz('24h')"><span class="zdpas-t">Rejestr · ostatnie 24 h</span></div>`;
   const pasekOd = `<div class="zdpas${zdTryb === 'zakres' ? ' akt' : ''}" data-lv="c.zdtryb" onclick="zdWybierz('zakres')"><span class="zdpas-t">Rejestr · od – do</span>${
@@ -9463,7 +9518,7 @@ function ekrZdarzenia(){
   return `<div class="tresc">
     ${pasek24}${pasekOd}
     <div class="zdkaty">${ptaszek(1, 'Użytkownik')}${ptaszek(2, 'Zdarzenia cykliczne')}${ptaszek(3, 'Zmiany w konfiguracji')}</div>
-    ${u.laduje ? `<div class="nota" data-lv="nota">szukam na karcie…</div>`
+    ${u.laduje && !pokaz ? `<div class="nota" data-lv="nota">szukam na karcie…</div>`
       : !pokaz ? `<div class="nota" data-lv="nota">${zdTryb === 'zakres' ? 'podaj zakres i naciśnij „pokaż"' : 'czekam na dane…'}</div>`
       : !pokaz.length ? `<div class="nota" data-lv="nota">nic w tym okresie${Object.values(zdKatWl).every(v => v) ? '' : ' (przy tych ptaszkach)'}</div>`
       : `<div class="zdtabw"><table class="zdtab" data-lv="o"><thead><tr><th>#</th><th>czas</th><th>zdarzenie</th><th>źródło</th></tr></thead><tbody>`
@@ -9471,7 +9526,7 @@ function ekrZdarzenia(){
         + `</tbody></table></div>`}
     <div class="nota" data-lv="nota" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
       ${u.linie ? `<span class="abtn" data-lv="abtn" onclick="kartaOkresPobierz('zdarzenia')">pobierz CSV</span>` : ''}
-      ${!u.laduje ? `<span class="abtn" data-lv="abtn" onclick="${zdTryb === '24h' ? "kartaOkresOstatnie('zdarzenia',24)" : "kartaOkresPola('zdarzenia')"}">odśwież</span>` : ''}</div>
+      ${!u.laduje ? `<span class="abtn" data-lv="abtn" onclick="${zdTryb === '24h' ? "kartaOkresOstatnie('zdarzenia',24)" : "kartaOkresPola('zdarzenia')"}">odśwież</span>` : `<span class="zdpas-i">odświeżam…</span>`}</div>
     ${sekcjaKarta('zdarzenia', x => zdKatWl[x[1]] ? `<div class="mrow odczyt" data-lv="o"><span class="t">${zdTekst(x)}<i>${kiedy(x[0])} · ${ZD_ZRODLO[x[3]] || x[3]}</i></span></div>` : '')}
   </div>` + pasek('SERWIS · dziennik zdarzeń', 'serwis');
 }
@@ -9491,13 +9546,16 @@ function ekrHistoria(){
        wpisy „ustapil" (x[1]==0) zjadaly polowe listy, a mowia tylko
        tyle, ze bylo i przeszlo - czas ustania widac po nastepnym
        wpisie tego samego bitu. */
-    const w = ((h && h.wpisy) ? h.wpisy : []).filter(x => x[1]).slice(0, 50);
+    /* [D-308] epizody zamiast każdego podniesienia: almSklej; wiersz = nazwa + czas PIERWSZEGO + „×n" gdy odbijał */
+    const wierszAlm = e => `<div class="mrow odczyt" data-lv="o"><span class="t">${nazwa(e.bit)}<i>${kiedy(e.czas)}${e.n > 1 ? ' · ×' + e.n : ''}</i></span></div>`;
+    const epizody = lin => almSklej(lin.filter(x => x[2]).map(x => ({ bit: x[1], czas: x[0] })));   /* linie CSV: czas;bit;pojawil */
+    const w = almSklej(((h && h.wpisy) ? h.wpisy : []).filter(x => x[1]).map(x => ({ bit: x[0], czas: x[2] }))).slice(0, 50);
     return `<div class="tresc">` + (!h ? `<div class="nota" data-lv="nota">wczytywanie…</div>`
       : !w.length ? `<div class="nota" data-lv="nota">${h.ile ? 'koniec listy' : 'brak zdarzeń od startu sterownika'}</div>`
-      : w.map(x => `<div class="mrow odczyt" data-lv="o"><span class="t">${nazwa(x[0])}<i>${kiedy(x[2])}</i></span></div>`).join('')
+      : w.map(wierszAlm).join('')
         + `<div class="nota" data-lv="nota">ostatnie ${w.length} alarmów${h.zgubione ? ' · utraconych: ' + h.zgubione : ''}</div>`)
-      + sekcjaOkres('alarmy', x => x[2] ? `<div class="mrow odczyt" data-lv="o"><span class="t">${nazwa(x[1])}<i>${kiedy(x[0])}</i></span></div>` : '')
-      + sekcjaKarta('alarmy', x => x[2] ? `<div class="mrow odczyt" data-lv="o"><span class="t">${nazwa(x[1])}<i>${kiedy(x[0])}</i></span></div>` : '')
+      + sekcjaOkres('alarmy', wierszAlm, epizody)
+      + sekcjaKarta('alarmy', wierszAlm, epizody)
       + `</div>` + pasek('SERWIS · historia alarmów', 'serwis');
   }
   const wpisy = [
@@ -9872,13 +9930,15 @@ if (PANEL_LEWY) {
       if (d[k] !== undefined && W[k] !== d[k]) { W[k] = d[k]; zmiana = true; }
     });
     if (d.czas) SRV_S.czasSter = d.czas;   /* zegar sterownika dla zapytań okresowych [D-298] */
+    let zdNowe = false;
     Object.keys(POLA_STANU).forEach(k => {
       const zr = d[POLA_STANU[k]];
       if (zr === undefined) return;
       /* obiekty (historia) porównujemy treścią - inaczej każdy pakiet = przerysowanie */
       const rowne = (zr !== null && typeof zr === 'object') ? JSON.stringify(zr) === JSON.stringify(SRV_S[k]) : SRV_S[k] === zr;
-      if (!rowne) { SRV_S[k] = zr; zmiana = true; }
+      if (!rowne) { if (k === 'zdarzenia' && SRV_S[k]) zdNowe = true; SRV_S[k] = zr; zmiana = true; }
     });
+    zdWczytajOdStartu(zdNowe);   /* [D-308] dziennik 24 h wczytany od startu, odświeżany przy nowych zdarzeniach */
     /* zakresy czujnikow tez ze sterownika - inaczej Kalibracja pokazuje
        skale, ktorej modul nie zna (ten sam blad, co progi w moscie) */
     if (d.progiPoz && d.progiPoz.zak && N.kal_poz_zak !== d.progiPoz.zak){
@@ -10280,5 +10340,47 @@ body:not(.bez-wody) .screen,body.bez-wody .screen{border-radius:0}
     var s = document.createElement('span'); s.id = 'woda-tgl'; s.textContent = wl ? 'woda: wł' : 'woda: wył'; s.title = 'efekt wody w tle - włącz/wyłącz';
     s.onclick = function () { wl = !wl; try { localStorage.setItem('woda', wl ? '1' : '0'); } catch (e) {} document.body.classList.toggle('bez-wody', !wl); s.textContent = wl ? 'woda: wł' : 'woda: wył'; start(); };
     w.parentNode.insertBefore(s, w.nextSibling); }, 200);
+})();
+</script>
+<style>
+/* ODCISK PALCA [D-308]: .odcisk = ślad w miejscu dotyku (prążki = repeating-radial-gradient, lekko owalny, losowy obrót);
+   .odcisk-akt = poświata dotkniętego kafla/wiersza (box-shadow - nie rusza układu). */
+.odcisk{position:fixed;left:0;top:0;pointer-events:none;z-index:96;width:52px;height:66px;margin:-33px -26px;border-radius:50%;
+  background:repeating-radial-gradient(ellipse 60% 70% at 50% 46%,rgba(60,140,220,.58) 0 1.1px,rgba(60,140,220,0) 1.1px 3.9px),
+             radial-gradient(ellipse at 50% 50%,rgba(150,210,255,.6),rgba(150,210,255,.3) 50%,rgba(150,210,255,0) 74%);   /* prążki w średnim błękicie: widoczne i na białym, i na ciemnym kaflu */
+  filter:blur(.35px);opacity:0;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(.7);
+  animation:odcisk 1.5s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes odcisk{0%{opacity:0;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(.7)}
+  10%{opacity:1;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(1)}
+  100%{opacity:0;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(1.08)}}
+.tile,.mrow,.zdpas{transition:box-shadow .5s ease}
+.tile.odcisk-akt,.mrow.odcisk-akt,.zdpas.odcisk-akt{box-shadow:0 0 0 2px rgba(127,199,255,.85),0 0 22px 2px rgba(127,199,255,.5),inset 0 0 26px rgba(127,199,255,.22);transition:box-shadow .08s ease}
+@media (hover:hover){.tile:hover{box-shadow:0 0 0 1.5px rgba(127,199,255,.55),0 0 14px rgba(127,199,255,.32)}}
+@media (prefers-reduced-motion:reduce){.odcisk{display:none}}
+</style>
+<script>
+(function () {
+  var ost = 0, zywe = 0;
+  document.addEventListener('pointerdown', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('.tile,.mrow,.zdpas') : null;
+    if (!el) return;
+    el.classList.add('odcisk-akt');
+    var zdejmij = function () { el.classList.remove('odcisk-akt'); };
+    document.addEventListener('pointerup', zdejmij, { once: true }); document.addEventListener('pointercancel', zdejmij, { once: true });
+    var t = Date.now(); if (t - ost < 90 || zywe > 6) return; ost = t;     /* seria +/- nie zasypuje ekranu odciskami */
+    var o = document.createElement('div'); o.className = 'odcisk';
+    o.style.setProperty('--x', e.clientX + 'px'); o.style.setProperty('--y', e.clientY + 'px');
+    o.style.setProperty('--rot', (Math.random() * 40 - 20).toFixed(1) + 'deg');
+    document.body.appendChild(o); zywe++;
+    var precz = function () { if (o.parentNode) { o.remove(); zywe--; } };
+    o.addEventListener('animationend', precz); setTimeout(precz, 1800);
+  }, { capture: true, passive: true });
+  /* PRÓBA DO ZRZUTU (sonda, ?odcisk_test=1): udawane dotknięcie kafla światła po 1,5 s, odcisk zatrzymany w pełnej jasności */
+  if (/[?&]odcisk_test=1/.test(location.search)) setTimeout(function () {
+    var k = document.querySelector('.tile.light .top') || document.querySelector('.tile'); if (!k) return;
+    var r = k.getBoundingClientRect();
+    k.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: r.left + r.width * 0.62, clientY: r.top + r.height * 0.55, pointerId: 1, pointerType: 'touch' }));
+    setTimeout(function () { document.querySelectorAll('.odcisk').forEach(function (o) { o.style.animationDelay = '-0.16s'; o.style.animationPlayState = 'paused'; }); }, 30);
+  }, 1500);
 })();
 </script>
