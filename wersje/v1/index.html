@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14161a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="ikona-192.png">
+<link rel="apple-touch-icon" href="ikona-192.png">
+<title>Sterownik basenowy — apka (prototyp PWA)</title>
+</head>
+<body>
+<style>
+  /* ============================================================
+     APKA PLATFORMY — prototyp PWA [Tomasz 2026-08-12: „próba"].
+     Mobile-first, dotyk, te same tokeny co panele. Dane: DEMO
+     (ożywione timerem) — docelowo REST/MQTT z mostka NanoPi/VPS.
+     ============================================================ */
+  :root{
+    --ink:#14161a; --ink2:#5d6470; --line:#dfe3e8; --page:#eef1f4;
+    --card:#ffffff; --alarm:#bb0000; --ok:#007700; --nav:64px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){ --page:#14171b; --card:#1c2026;
+      --ink:#e8eaee; --ink2:#98a0ad; --line:#2b313a; }
+  }
+  :root[data-theme="dark"]{ --page:#14171b; --card:#1c2026;
+    --ink:#e8eaee; --ink2:#98a0ad; --line:#2b313a; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--page);color:var(--ink);
+    font:16px/1.5 ui-sans-serif,system-ui,"Segoe UI",Roboto,Arial,sans-serif;
+    font-variant-numeric:tabular-nums}
+  .ap{max-width:520px;margin:0 auto;padding:14px 14px calc(var(--nav) + 24px)}
+
+  /* pasek góry: obiekt + stan połączenia */
+  .top{display:flex;align-items:center;gap:10px;margin:2px 2px 14px}
+  .top h1{font-size:1.05rem;margin:0;letter-spacing:-.01em}
+  .top .obj{font-size:.72rem;color:var(--ink2)}
+  .lacz{margin-left:auto;display:flex;align-items:center;gap:6px;
+        font-size:.72rem;font-weight:700;color:var(--ok)}
+  .lacz i{width:8px;height:8px;border-radius:50%;background:var(--ok);
+          display:inline-block;animation:puls 2.4s ease-in-out infinite}
+  @keyframes puls{50%{opacity:.35}}
+
+  /* kafle */
+  .siat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kaf{background:var(--card);border:1px solid var(--line);border-radius:14px;
+       padding:14px 16px;min-height:96px;display:flex;flex-direction:column;
+       box-shadow:0 1px 2px rgba(20,22,26,.05)}
+  .kaf.szer{grid-column:1/-1}
+  .kaf .et{font-size:.72rem;color:var(--ink2);letter-spacing:.02em}
+  .kaf .w{font-size:1.9rem;font-weight:650;letter-spacing:-.02em;line-height:1.15;
+          margin-top:2px}
+  .kaf .w small{font-size:.85rem;color:var(--ink2);font-weight:600;margin-left:3px}
+  .kaf .dop{font-size:.74rem;color:var(--ink2);margin-top:auto;padding-top:6px}
+  .kaf .dop b{color:var(--ink)}
+  .kaf.al{border:1.6px solid var(--alarm)}
+  .kaf.al .w,.kaf.al .et{color:var(--alarm)}
+  .sekc{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:var(--ink2);
+        margin:20px 4px 8px}
+  .pig{display:inline-flex;padding:3px 10px;border-radius:6px;font-size:.7rem;
+       font-weight:700;border:1px solid var(--line);color:var(--ink2)}
+  .pig.on{border:1.4px solid var(--ink);color:var(--ink)}
+  .pig.zle{border:1.4px solid var(--alarm);color:var(--alarm)}
+
+  /* alarm pasek */
+  .alpas{display:none;background:rgba(187,0,0,.92);color:#fff;border-radius:12px;
+         padding:12px 14px;margin-bottom:12px;font-size:.9rem;font-weight:650;
+         line-height:1.45}
+  .alpas.jest{display:block}
+  .alpas small{display:block;font-weight:500;opacity:.9;font-size:.76rem;margin-top:2px}
+
+  /* trendy */
+  .wyk{background:var(--card);border:1px solid var(--line);border-radius:14px;
+       padding:14px 12px 8px}
+  .wyk canvas{width:100%;height:200px;display:block}
+  .wyk .leg{display:flex;gap:14px;font-size:.72rem;color:var(--ink2);
+            padding:8px 4px 4px;flex-wrap:wrap}
+  .wyk .leg i{width:10px;height:3px;display:inline-block;vertical-align:middle;
+              margin-right:5px;border-radius:2px}
+  .wybor{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+  .wybor button{flex:1;min-width:80px;padding:10px 6px;border-radius:10px;
+    border:1px solid var(--line);background:var(--card);color:var(--ink2);
+    font:700 .78rem/1 inherit;letter-spacing:.03em;cursor:pointer}
+  .wybor button.sel{border:1.6px solid var(--ink);color:var(--ink)}
+
+  /* nastawy */
+  .nast{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:14px 16px;margin-bottom:10px}
+  .nast .rz{display:flex;align-items:center;gap:12px;min-height:56px}
+  .nast .rz + .rz{border-top:1px solid var(--line)}
+  .nast .n{font-weight:650;font-size:.92rem}
+  .nast .n small{display:block;font-weight:500;color:var(--ink2);font-size:.74rem}
+  .step{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .step button{width:52px;height:44px;border-radius:10px;border:1px solid var(--line);
+    background:var(--page);color:var(--ink);font:600 1.3rem/1 inherit;cursor:pointer}
+  .step button:active{background:var(--line)}
+  .step .v{min-width:84px;text-align:center;font-weight:700;font-size:1.05rem}
+  .przel{margin-left:auto;width:58px;height:32px;border-radius:16px;background:var(--line);
+         position:relative;cursor:pointer;transition:background .15s}
+  .przel i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;
+           background:var(--card);transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .przel.on{background:var(--ink)}
+  .przel.on i{left:29px}
+  .zapis{position:fixed;left:50%;bottom:calc(var(--nav) + 16px);transform:translateX(-50%);
+    background:var(--ink);color:var(--page);padding:10px 22px;border-radius:10px;
+    font-size:.85rem;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}
+  .zapis.jest{opacity:1}
+
+  /* system */
+  .mod{display:flex;align-items:center;gap:12px;min-height:54px}
+  .mod + .mod{border-top:1px solid var(--line)}
+  .mod .mn{font-weight:650;font-size:.9rem}
+  .mod .mn small{display:block;color:var(--ink2);font-weight:500;font-size:.72rem}
+  .mod .st{margin-left:auto;font-size:.76rem;font-weight:700;color:var(--ok)}
+  .mod .st.zle{color:var(--alarm)}
+  .ota{border:1.6px dashed var(--line);border-radius:12px;padding:16px;text-align:center;
+       color:var(--ink2);font-size:.82rem;line-height:1.5;margin-top:10px}
+  .ota b{color:var(--ink)}
+  .zd{font-size:.8rem;color:var(--ink2);padding:7px 2px;border-top:1px solid var(--line);
+      display:flex;gap:10px}
+  .zd:first-of-type{border-top:0}
+  .zd b{color:var(--ink);font-weight:650;white-space:nowrap}
+
+  /* AI pasek (wizja) */
+  .ai{display:flex;gap:10px;background:var(--card);border:1px solid var(--line);
+      border-radius:14px;padding:12px 14px;margin-top:10px;font-size:.8rem;
+      color:var(--ink2);line-height:1.5}
+  .ai .iko{font-size:20px}
+  .ai b{color:var(--ink)}
+
+  /* dolna nawigacja */
+  nav{position:fixed;left:0;right:0;bottom:0;height:var(--nav);
+      background:var(--card);border-top:1px solid var(--line);display:flex;
+      max-width:520px;margin:0 auto}
+  nav button{flex:1;border:0;background:none;color:var(--ink2);cursor:pointer;
+    font:700 .66rem/1.2 inherit;letter-spacing:.04em;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:3px}
+  nav button.sel{color:var(--ink)}
+  nav button .i{font-size:20px;line-height:1}
+  .ekran{display:none}
+  .ekran.sel{display:block}
+</style>
+
+<div class="ap">
+  <div class="top">
+    <div><h1>🏊 Sterownik basenowy</h1>
+      <div class="obj">obiekt: DOM POKAZOWY · basen + wanna</div></div>
+    <div class="lacz"><i></i>NA ŻYWO</div>
+  </div>
+
+  <!-- ================= PULPIT ================= -->
+  <div class="ekran sel" id="e-pulpit">
+    <div class="alpas" id="alpas"><span id="altxt"></span>
+      <small>dotknij alarm na panelu, żeby skwitować · pełna lista w SYSTEM</small></div>
+
+    <div class="sekc">BASEN</div>
+    <div class="siat">
+      <div class="kaf"><span class="et">temperatura wody</span>
+        <span class="w"><span id="tB">27,4</span><small>°C</small></span>
+        <span class="dop">zadana <b>28,0 °C</b> · <span id="grzB">grzeje</span></span></div>
+      <div class="kaf"><span class="et">pompa · filtracja</span>
+        <span class="w" style="font-size:1.15rem;padding-top:6px" id="pompB">AUTO · pracuje</span>
+        <span class="dop">okno <b>08:00–22:00</b> · ciśnienie <b id="cisB">0,42 bar</b></span></div>
+      <div class="kaf"><span class="et">pH</span><span class="w" id="phB">7,2</span>
+        <span class="dop">widełki <b>7,0–7,4</b></span></div>
+      <div class="kaf"><span class="et">redox</span>
+        <span class="w"><span id="rxB">742</span><small>mV</small></span>
+        <span class="dop">widełki <b>650–780 mV</b></span></div>
+      <div class="kaf szer"><span class="et">poziom wody · dolewanie</span>
+        <span class="w"><span id="pozB">312</span><small>mm</small></span>
+        <span class="dop">start &lt; <b>300</b> · stop <b>320 mm</b> · dziś dolano <b>41 l</b></span></div>
+    </div>
+
+    <div class="sekc">WANNA SPA</div>
+    <div class="siat">
+      <div class="kaf"><span class="et">temperatura wody</span>
+        <span class="w"><span id="tW">34,1</span><small>°C</small></span>
+        <span class="dop">zadana <b>35,0 °C</b> · grzeje</span></div>
+      <div class="kaf"><span class="et">pompa · filtracja</span>
+        <span class="w" style="font-size:1.15rem;padding-top:6px">AUTO · postój</span>
+        <span class="dop">zbiornik <b>541 mm</b> · ciśnienie <b>0,31 bar</b></span></div>
+    </div>
+  </div>
+
+  <!-- ================= TRENDY ================= -->
+  <div class="ekran" id="e-trendy">
+    <div class="sekc" style="margin-top:2px">OSTATNIE 24 H</div>
+    <div class="wybor" id="twyb">
+      <button class="sel" data-t="temp">TEMPERATURA</button>
+      <button data-t="cis">CIŚNIENIE</button>
+      <button data-t="poz">POZIOM</button>
+    </div>
+    <div class="wyk"><canvas id="cv" width="960" height="400"></canvas>
+      <div class="leg" id="leg"></div></div>
+    <div class="ai"><span class="iko">🤖</span><span><b>Asystent (wizja):</b>
+      „Ciśnienie rośnie o 0,02 bar/dobę od płukania 10.08 — przy tym tempie
+      próg ostrzeżenia w czwartek. Zaplanować płukanie w środę wieczorem?"
+      <br><i>— docelowo Claude przez MCP czyta trendy i dziennik obiektu.</i></span></div>
+  </div>
+
+  <!-- ================= NASTAWY ================= -->
+  <div class="ekran" id="e-nastawy">
+    <div class="sekc" style="margin-top:2px">BASEN</div>
+    <div class="nast">
+      <div class="rz"><span class="n">Temperatura zadana<small>krok 0,5 °C</small></span>
+        <span class="step"><button onclick="nast('tzB',-0.5)">−</button>
+          <span class="v"><span id="tzB">28,0</span> °C</span>
+          <button onclick="nast('tzB',0.5)">+</button></span></div>
+      <div class="rz"><span class="n">Grzanie</span>
+        <span class="przel on" onclick="przel(this)"><i></i></span></div>
+      <div class="rz"><span class="n">Dolewanie automatyczne<small>histereza 300→320 mm</small></span>
+        <span class="przel on" onclick="przel(this)"><i></i></span></div>
+    </div>
+    <div class="sekc">WANNA SPA</div>
+    <div class="nast">
+      <div class="rz"><span class="n">Temperatura zadana</span>
+        <span class="step"><button onclick="nast('tzW',-0.5)">−</button>
+          <span class="v"><span id="tzW">35,0</span> °C</span>
+          <button onclick="nast('tzW',0.5)">+</button></span></div>
+      <div class="rz"><span class="n">Grzanie</span>
+        <span class="przel on" onclick="przel(this)"><i></i></span></div>
+    </div>
+    <div class="ai"><span class="iko">🔒</span><span><b>Zasada platformy:</b>
+      nastawy idą do modułu przez Modbus i tam są WALIDOWANE — apka niczego
+      nie wymusi poza limitami firmware. Harmonogramy i serwis: na panelu
+      (tu tylko podgląd, żeby ekran telefonu nie udawał szafy).</span></div>
+  </div>
+
+  <!-- ================= SYSTEM ================= -->
+  <div class="ekran" id="e-system">
+    <div class="sekc" style="margin-top:2px">MODUŁY</div>
+    <div class="nast">
+      <div class="mod"><span class="mn">B8M — proces wodny<small>slave 1 · fw 1.4.2</small></span>
+        <span class="st">OK · 12 ms</span></div>
+      <div class="mod"><span class="mn">A16 — akcesoria<small>slave 2 · fw 0.9.1</small></span>
+        <span class="st">OK · 18 ms</span></div>
+      <div class="mod"><span class="mn">Panel 4″ hala<small>LVGL v3.1</small></span>
+        <span class="st">OK</span></div>
+    </div>
+    <div class="ota"><b>Aktualizacja firmware (OTA)</b><br>
+      przeciągnij plik .bin albo wybierz z dysku — moduł przełączy partycję
+      A/B po weryfikacji sumy<br><i>(aktywne po podłączeniu mostka)</i></div>
+    <div class="sekc">OSTATNIE ZDARZENIA</div>
+    <div class="nast">
+      <div class="zd"><b>13:12</b> Koniec płukania tor 1 — ciśnienie po: 0,42 bar</div>
+      <div class="zd"><b>11:09</b> Dolewanie basen — STOP (315 mm, dolano 41 l)</div>
+      <div class="zd"><b>09:00</b> Filtracja basen — start z harmonogramu</div>
+      <div class="zd"><b>wcz. 21:14</b> Zmiana nastawy: temperatura basen 28,0 °C</div>
+    </div>
+  </div>
+</div>
+
+<div class="zapis" id="zapis">✓ wysłano do modułu</div>
+
+<nav>
+  <button class="sel" data-e="pulpit"><span class="i">▦</span>PULPIT</button>
+  <button data-e="trendy"><span class="i">📈</span>TRENDY</button>
+  <button data-e="nastawy"><span class="i">🎚</span>NASTAWY</button>
+  <button data-e="system"><span class="i">⚙</span>SYSTEM</button>
+</nav>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  /* nawigacja dolna */
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('sel'));
+    document.querySelectorAll('.ekran').forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel');
+    $('e-' + b.dataset.e).classList.add('sel');
+    if (b.dataset.e === 'trendy') rysuj();
+  });
+
+  /* DEMO: dane „żyją" — docelowo REST/MQTT z mostka */
+  const D = { tB:27.4, tW:34.1, ph:7.21, rx:742, poz:312, cis:0.42 };
+  const f1 = x => x.toFixed(1).replace('.', ',');
+  setInterval(() => {
+    D.tB += (Math.random()-0.48)*0.03; D.rx += (Math.random()-0.5)*1.4;
+    D.cis += (Math.random()-0.5)*0.004; D.poz += (Math.random()-0.52)*0.4;
+    $('tB').textContent = f1(D.tB);
+    $('rxB').textContent = Math.round(D.rx);
+    $('cisB').textContent = D.cis.toFixed(2).replace('.', ',') + ' bar';
+    $('pozB').textContent = Math.round(D.poz);
+  }, 1600);
+
+  /* nastawy demo */
+  const N = { tzB:28.0, tzW:35.0 };
+  window.nast = (k, d) => {
+    N[k] = Math.min(40, Math.max(10, N[k] + d));
+    $(k).textContent = f1(N[k]);
+    blysk();
+  };
+  window.przel = el => { el.classList.toggle('on'); blysk(); };
+  let bt = 0;
+  function blysk(){
+    $('zapis').classList.add('jest');
+    clearTimeout(bt); bt = setTimeout(() => $('zapis').classList.remove('jest'), 1200);
+  }
+
+  /* trendy — canvas, dane demo 24 h */
+  const SER = {
+    temp: [{n:'basen [°C]', k:'#14161a', min:26, max:29,
+            g: h => 27.4 + Math.sin(h/3.8)*0.5 + (h>19?0.3:0)},
+           {n:'wanna [°C]', k:'#5b7596', min:26, max:36,
+            g: h => 34 + Math.sin(h/5)*0.6}],
+    cis:  [{n:'ciśnienie basen [bar]', k:'#14161a', min:0.3, max:0.6,
+            g: h => 0.40 + h*0.004 + Math.sin(h)*0.01}],
+    poz:  [{n:'poziom basen [mm]', k:'#14161a', min:280, max:340,
+            g: h => 312 - (h>10&&h<11 ? 14 : 0) + Math.sin(h/2)*2}]
+  };
+  let tryb = 'temp';
+  document.querySelectorAll('#twyb button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#twyb button').forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel'); tryb = b.dataset.t; rysuj();
+  });
+  function rysuj(){
+    const c = $('cv'), x = c.getContext('2d');
+    const ink2 = getComputedStyle(document.body).getPropertyValue('color');
+    x.clearRect(0,0,c.width,c.height);
+    const s = SER[tryb], mn = Math.min(...s.map(q=>q.min)), mx = Math.max(...s.map(q=>q.max));
+    x.strokeStyle = 'rgba(128,136,148,.25)'; x.lineWidth = 1;
+    for (let i=0;i<=4;i++){ const y = 20+(c.height-50)*i/4;
+      x.beginPath(); x.moveTo(40,y); x.lineTo(c.width-10,y); x.stroke(); }
+    x.fillStyle = 'rgba(128,136,148,.9)'; x.font = '20px system-ui';
+    for (let h=0;h<=24;h+=6)
+      x.fillText(String(h).padStart(2,'0')+':00', 40+(c.width-60)*h/24-20, c.height-6);
+    s.forEach(q => {
+      x.strokeStyle = q.k; x.lineWidth = 3.5; x.beginPath();
+      for (let h=0;h<=24;h+=0.25){
+        const px = 40+(c.width-60)*h/24;
+        const py = 20+(c.height-50)*(1-(q.g(h)-mn)/(mx-mn));
+        h===0 ? x.moveTo(px,py) : x.lineTo(px,py);
+      }
+      x.stroke();
+    });
+    $('leg').innerHTML = s.map(q =>
+      `<span><i style="background:${q.k}"></i>${q.n}</span>`).join('');
+  }
+  rysuj();
+
+  /* alarm demo: pojawia się po 20 s, żeby pokazać pasek */
+  setTimeout(() => {
+    $('altxt').textContent = 'Płukanie przerwane / niewykonane — BASEN (pn 10.08 06:18)';
+    $('alpas').classList.add('jest');
+  }, 20000);
+})();
+</script>
+
+<script>
+/* rejestracja service workera = instalowalnosc + offline */
+if ('serviceWorker' in navigator)
+  navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
