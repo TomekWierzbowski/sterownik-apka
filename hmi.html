@@ -1111,7 +1111,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'dbc030dd26';
+window.APKA_WERSJA = '773d86b275';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -10343,44 +10343,20 @@ body:not(.bez-wody) .screen,body.bez-wody .screen{border-radius:0}
 })();
 </script>
 <style>
-/* ODCISK PALCA [D-308]: .odcisk = ślad w miejscu dotyku (prążki = repeating-radial-gradient, lekko owalny, losowy obrót);
-   .odcisk-akt = poświata dotkniętego kafla/wiersza (box-shadow - nie rusza układu). */
-.odcisk{position:fixed;left:0;top:0;pointer-events:none;z-index:96;width:52px;height:66px;margin:-33px -26px;border-radius:50%;
-  background:repeating-radial-gradient(ellipse 60% 70% at 50% 46%,rgba(60,140,220,.58) 0 1.1px,rgba(60,140,220,0) 1.1px 3.9px),
-             radial-gradient(ellipse at 50% 50%,rgba(150,210,255,.6),rgba(150,210,255,.3) 50%,rgba(150,210,255,0) 74%);   /* prążki w średnim błękicie: widoczne i na białym, i na ciemnym kaflu */
-  filter:blur(.35px);opacity:0;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(.7);
-  animation:odcisk 1.5s cubic-bezier(.2,.7,.3,1) forwards}
-@keyframes odcisk{0%{opacity:0;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(.7)}
-  10%{opacity:1;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(1)}
-  100%{opacity:0;transform:translate(var(--x),var(--y)) rotate(var(--rot)) scale(1.08)}}
+/* POŚWIATA DOTKNIĘTEGO KAFLA [D-308]: dotknięty kafel/wiersz świeci (box-shadow - nie rusza układu), gaśnie po puszczeniu.
+   Ślad odcisku palca w miejscu dotyku był tu 11.09 01:40-02:00 i został ZDJĘTY [Tomasz 02:00: „wyrzuć odcisk"]. */
 .tile,.mrow,.zdpas{transition:box-shadow .5s ease}
 .tile.odcisk-akt,.mrow.odcisk-akt,.zdpas.odcisk-akt{box-shadow:0 0 0 2px rgba(127,199,255,.85),0 0 22px 2px rgba(127,199,255,.5),inset 0 0 26px rgba(127,199,255,.22);transition:box-shadow .08s ease}
 @media (hover:hover){.tile:hover{box-shadow:0 0 0 1.5px rgba(127,199,255,.55),0 0 14px rgba(127,199,255,.32)}}
-@media (prefers-reduced-motion:reduce){.odcisk{display:none}}
 </style>
 <script>
 (function () {
-  var ost = 0, zywe = 0;
   document.addEventListener('pointerdown', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('.tile,.mrow,.zdpas') : null;
     if (!el) return;
     el.classList.add('odcisk-akt');
     var zdejmij = function () { el.classList.remove('odcisk-akt'); };
     document.addEventListener('pointerup', zdejmij, { once: true }); document.addEventListener('pointercancel', zdejmij, { once: true });
-    var t = Date.now(); if (t - ost < 90 || zywe > 6) return; ost = t;     /* seria +/- nie zasypuje ekranu odciskami */
-    var o = document.createElement('div'); o.className = 'odcisk';
-    o.style.setProperty('--x', e.clientX + 'px'); o.style.setProperty('--y', e.clientY + 'px');
-    o.style.setProperty('--rot', (Math.random() * 40 - 20).toFixed(1) + 'deg');
-    document.body.appendChild(o); zywe++;
-    var precz = function () { if (o.parentNode) { o.remove(); zywe--; } };
-    o.addEventListener('animationend', precz); setTimeout(precz, 1800);
   }, { capture: true, passive: true });
-  /* PRÓBA DO ZRZUTU (sonda, ?odcisk_test=1): udawane dotknięcie kafla światła po 1,5 s, odcisk zatrzymany w pełnej jasności */
-  if (/[?&]odcisk_test=1/.test(location.search)) setTimeout(function () {
-    var k = document.querySelector('.tile.light .top') || document.querySelector('.tile'); if (!k) return;
-    var r = k.getBoundingClientRect();
-    k.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: r.left + r.width * 0.62, clientY: r.top + r.height * 0.55, pointerId: 1, pointerType: 'touch' }));
-    setTimeout(function () { document.querySelectorAll('.odcisk').forEach(function (o) { o.style.animationDelay = '-0.16s'; o.style.animationPlayState = 'paused'; }); }, 30);
-  }, 1500);
 })();
 </script>
