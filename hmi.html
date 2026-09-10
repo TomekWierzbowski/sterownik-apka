@@ -1032,7 +1032,7 @@
         color:#5d6470;padding:1px 4px 1px;text-transform:uppercase}.srv .mrow.odczyt{cursor:default}.srv .mrow.odczyt:active{background:#fff}
 
   /* ptaszek serwisowy (opcje WŁ/WYŁ) — kwadrat, nie suwaczek z telefonu */
-  /* DZIENNIK ZDARZEŃ [D-299b]: wąskie paski wyboru (wybrany = podświetlona ramka), mini-ptaszki, tabela z numerem */.srv .zdpas{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px;padding:3px 10px;border:2px solid #cfd3d8;border-radius:5px;background:#fff;cursor:pointer}.srv .zdpas.akt{border-color:#14161a;background:#14161a;color:#fff}.srv .zdpas-t{font-size:15px;font-weight:600;white-space:nowrap}.srv .zdpas-i{font-size:13px;color:#5d6470;font-weight:500}.srv .zdpas.akt .zdpas-i{color:#cfd3d8}.srv .zdzakres{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:14px;font-weight:500}.srv .zdzakres input{font:inherit;font-size:14px;padding:1px 4px;border:1px solid #cfd3d8;border-radius:4px;background:#fff;color:#14161a}.srv .zdpas.akt .abtn{background:#fff;color:#14161a}.srv .zdkaty{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}.srv .zdkaty .mrow.zdmini{flex:1 1 30%;min-width:140px;min-height:30px;padding:2px 8px;gap:6px}.srv .zdkaty .mrow.zdmini .ptaszek{width:18px;height:18px}.srv .zdkaty .mrow.zdmini .t{font-size:14px;font-weight:600}.srv .zdtabw{overflow:auto;flex:0 0 auto;max-height:52vh;border:1px solid #dcdcdc;border-radius:4px;background:#fff}.srv .zdtab{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}.srv .zdtab th, .srv .zdtab td{border-bottom:1px solid #dcdcdc;padding:5px 6px;text-align:left;vertical-align:top}.srv .zdtab th{background:#e9ebee;font-weight:600;position:sticky;top:0}.srv .zdtab td.nr{color:#98a0ad;text-align:right;padding-right:4px}.srv .zdtab td:nth-child(2){white-space:nowrap;color:#14161a}   /* czas ciemny - jasna czcionka wyglądała jak puste pole [Tomasz 2026-09-11] */.srv .zdtab td:last-child{white-space:nowrap;color:#14161a}.srv .zdtab tr.k3 td{color:#7a5200}.srv .ptaszek{width:22px;height:22px;border:2px solid #5d6470;border-radius:4px;flex:0 0 auto;
+  /* DZIENNIK ZDARZEŃ [D-299b]: wąskie paski wyboru (wybrany = podświetlona ramka), mini-ptaszki, tabela z numerem */.srv .zdpas{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px;padding:3px 10px;border:2px solid #cfd3d8;border-radius:5px;background:#fff;cursor:pointer}.srv .zdpas.akt{border-color:#14161a;background:#14161a;color:#fff}.srv .zdpas-t{font-size:15px;font-weight:600;white-space:nowrap}.srv .zdpas-i{font-size:13px;color:#5d6470;font-weight:500}.srv .zdpas.akt .zdpas-i{color:#cfd3d8}.srv .zdzakres{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:14px;font-weight:500}.srv .zdzakres input{font:inherit;font-size:14px;padding:1px 4px;border:1px solid #cfd3d8;border-radius:4px;background:#fff;color:#14161a}.srv .zdpas.akt .abtn{background:#fff;color:#14161a}.srv .zdkaty{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}.srv .zdkaty .mrow.zdmini{flex:1 1 30%;min-width:140px;min-height:30px;padding:2px 8px;gap:6px}.srv .zdkaty .mrow.zdmini .ptaszek{width:18px;height:18px}.srv .zdkaty .mrow.zdmini .t{font-size:14px;font-weight:600}.srv .zdtabw{overflow:auto;flex:0 0 auto;max-height:52vh;border:1px solid #dcdcdc;border-radius:4px;background:#fff}.srv .zdtab{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}.srv .zdtab th, .srv .zdtab td{border-bottom:1px solid #dcdcdc;padding:5px 6px;text-align:left;vertical-align:top}.srv .zdtab th{background:#e9ebee;font-weight:600;position:sticky;top:0}.srv .zdtab td.nr{color:#98a0ad;text-align:right;padding-right:4px}.srv .zdtab td{color:#14161a}   /* CAŁA treść ciemna [Tomasz 2026-09-11: „teksty jak »oświetlenie białe wyłączono« są jasno"] */.srv .zdtab td:nth-child(2){white-space:nowrap}.srv .zdtab td:last-child{white-space:nowrap}.srv .zdtab tr.k3 td{color:#7a5200}.srv .ptaszek{width:22px;height:22px;border:2px solid #5d6470;border-radius:4px;flex:0 0 auto;
            display:flex;align-items:center;justify-content:center;background:#fff}.srv .ptaszek svg{width:15px;height:15px;display:none}.srv .mrow.wl .ptaszek{background:#14161a;border-color:#14161a}.srv .mrow.wl .ptaszek svg{display:block;color:#fff}
 
   /* przyciski akcji na ekranach */.srv .abtn{flex:0 0 auto;min-height:44px;border-radius:6px;border:1px solid #14161a;
@@ -1111,7 +1111,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'b1c90f3894';
+window.APKA_WERSJA = '9b87f7c06f';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1602,7 +1602,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-11 00:05';
+window.HMI_ZBUDOWANO = '2026-09-11 00:47';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -6426,7 +6426,10 @@ function cisAutomat(){
   }
   return zmiana;
 }
-setInterval(() => {
+/* SYMULATOR NIE W ROLI ODBIORCY [D-307, Tomasz 2026-09-11: „ekran serwis rwie o 1 kafel co kilka sekund"]:
+   przy żywym sterowniku (PANEL_LEWY) zatrzask przychodzi w pakiecie; lokalny automat zakładał go sam przy cis=0
+   i pracującej pompie, a następny pakiet zdejmował - grupa „POMPA ZATRZYMANA" migała co ~12 s na 200 ms. */
+if (!PANEL_LEWY) setInterval(() => {
   if (cisAutomat()){ srvRender(false); if (window.duoSlij) window.duoSlij(); }
 }, 1000);
 
@@ -6875,12 +6878,15 @@ function ekrSerwis(){
           Wiersz tylko, gdy obiekt ma kanaly akcesoriow - bez nich nie ma
           czego uczyc. Pod mostem/AP ekran czyta rejestry 3092+/4700+ sam. */''}
     ${SRV_S.akc_ist ? (SRV_S.pilot && SRV_S.pilot.zlacze === false
-      /* PŁYTA BEZ ZŁĄCZA RADIA [D-293, Tomasz: „B8M pilota nie mają, brak złącz, tylko A6 v3"]: wiersz zostaje, ale
-         wyszarzony i nieklikalny - żeby było wiadomo, że funkcja istnieje na innej płycie, a tu nie ma czego szukać.
-         Dawne „radio nie odpowiada" wyglądało jak awaria. */
-      ? `<div class="mrow" data-lv="idz.pilot" style="opacity:.45;pointer-events:none"><span class="t">Pilot 433 MHz<i>brak złącza radia na tej płycie (tylko A6 v3)</i></span></div>`
+      /* PŁYTA BEZ ZŁĄCZA RADIA [D-293 → D-307, Tomasz 2026-09-11: „jak sterownik czegoś nie obsługuje, serwis nie
+         powinien tego wyświetlać"]: wiersza NIE MA (B8M nie ma gniazda CC1101, pilot jest tylko na A6 v3).
+         Zanim rejestry 3092+ dojdą (SRV_S.pilot === null) wiersz jest wyszarzony i nieklikalny - dotąd dało się wejść
+         i zobaczyć naukę przycisków dla ośmiu kanałów na płycie bez radia. */
+      ? ''
+      : !SRV_S.pilot
+      ? `<div class="mrow" data-lv="idz.pilot" style="opacity:.45;pointer-events:none"><span class="t">Pilot 433 MHz<i>sprawdzam, czy płyta ma złącze radia…</i></span></div>`
       : `<div class="mrow" data-lv="idz.pilot" onclick="idz('pilot')"><span class="t">Pilot 433 MHz<i>${
-      SRV_S.pilot && SRV_S.pilot.chip === false ? 'radio nie odpowiada' : (SRV_S.pilot ? (SRV_S.pilot.wpisy.filter(w => w.kanal !== 255).length + ' przycisków sparowanych') : 'nauka przycisków, sparowane piloty')}</i></span><span class="ch">›</span></div>`) : ''}
+      SRV_S.pilot && SRV_S.pilot.chip === false ? 'radio nie odpowiada' : (SRV_S.pilot ? ((n => n === 1 ? '1 przycisk sparowany' : (n >= 2 && n <= 4 ? n + ' przyciski sparowane' : n + ' przycisków sparowanych'))(SRV_S.pilot.wpisy.filter(w => w.kanal !== 255).length)) : 'nauka przycisków, sparowane piloty')}</i></span><span class="ch">›</span></div>`) : ''}
     <div class="mrow" data-lv="idz.obejscia" onclick="idz('obejscia')"><span class="t">Funkcje</span>${
       (SRV_S.obejscie_sonda||SRV_S.obejscie_mano) ? '<span class="w" style="color:#7a5200">AKTYWNE</span>'
       : (() => { const wyl = [['grz_wl','GRZANIE'],['dol_wl','DOLEWANIE'],
@@ -7829,7 +7835,8 @@ function pilotSlij(adr, wart){
 }
 async function pilotOdswiez(){
   /* [D-277] jw. - pilot czyta rejestry z lustra */
-  if (SRV_S.ekran !== 'pilot') return;
+  /* [D-307] także z menu serwisu, dopóki nie wiadomo, czy płyta ma złącze - wiersz „Pilot" zależy od 3096 b10 */
+  if (SRV_S.ekran !== 'pilot' && !(SRV_S.ekran === 'serwis' && !SRV_S.pilot && SRV_S.akc_ist)) return;
   try {
     const a = await pilotRej(3092, 5), b = await pilotRej(4700, 26);
     if (a.length < 5 || b.length < 26 || b[0] === null) return;
@@ -7855,10 +7862,12 @@ function ekrPilot(){
   for (let k = 0; k < 16; k++) if ((SRV_S.akc_ist >> (k % 8)) & 1 && k < 8) kanaly.push(k);
   if (!p) return `<div class="tresc"><div class="nota" data-lv="nota">Czekam na rejestry pilota (3092+/4700+) — pod mostem albo ze strony sterownika.</div></div>` + pasek('SERWIS · pilot 433', 'serwis');
   const spar = p.wpisy.filter(w => w.kanal !== 255);
+  /* [D-307] płyta bez złącza: SAMA nota - nauka przycisków i lista sparowanych nie mają tu sensu (Tomasz: „są tam masaże
+     od 1 do 8 z zadeklarowanymi danymi") */
+  if (p.zlacze === false) return `<div class="tresc"><div class="nota" data-lv="nota"><b>Ta płyta nie ma złącza radia</b> — pilot 433 MHz jest dostępny na A6 v3;
+      B8M nie ma gniazda CC1101. Światło i masaż działają z ekranu i z przycisków przy niecce.</div></div>` + pasek('SERWIS · pilot 433', 'serwis');
   return `<div class="tresc">
-    ${p.zlacze === false ? `<div class="nota" data-lv="nota"><b>Ta płyta nie ma złącza radia</b> — pilot 433 MHz jest dostępny na A6 v3;
-      B8M nie ma gniazda CC1101. Światło i masaż działają z ekranu i z przycisków przy niecce.</div>`
-    : !p.chip ? `<div class="alarmuje" data-lv="alarmuje"><b>Radio CC1101 nie odpowiada po SPI.</b>
+    ${!p.chip ? `<div class="alarmuje" data-lv="alarmuje"><b>Radio CC1101 nie odpowiada po SPI.</b>
       Sprawdź moduł na gnieździe (3V3, GND, CSN, SCK, MOSI, MISO, GDO0). Światło i masaż działają z ekranu, pilot nie.</div>` : ''}
     <div class="grupka" data-lv="g">OSTATNIO ODEBRANY</div>
     <div class="mrow"><span class="t">${p.kod ? hex(p.kod) + ' · ' + p.bity + ' bit · ' + protNazwa(p.prot, p.kod) : 'nic jeszcze nie odebrano'}<i>${
@@ -8604,12 +8613,18 @@ const ALARMY_LISTA = [
      blok:'grzanie'},
     {id:'tempbrak', bit:28, nazwa:'Czujnik temperatury niewykryty',
      op:'Na magistrali 1-Wire nigdy go nie było — podłącz czujnik albo zdejmij grzanie z ruchu.',
-     blok:'grzanie'}
+     blok:'grzanie'},
+    {id:'temppowbrak', bit:36, sys:true, nazwa:'Czujnik temperatury powietrza niewykryty',
+     op:'Czujnik powietrza jest w mapie I/O, ale nie odzywa się na 1-Wire — ekran pokazuje 0 °C. Gaśnie sam, gdy czujnik się odezwie. [D-207b]',
+     blok:null}
   ]],
   ['POMPA I ZABEZPIECZENIA', [
     {id:'termik', bit:8, nazwa:'Termik pompy filtracyjnej',
      op:'Styk NC rozwarty ponad 0,3 s. Gaśnie sam po 10 s zwartego obwodu (TERMIK_POWROT_MS; na stole zmierzone 10–11 s, D-238) — skwitować się go nie da.',
      blok:'pompę i płukanie'},
+    {id:'termikakc', bit:34, nazwa:'Termik pompy akcesoriów',
+     op:'Styk NC pompy masażu / atrakcji rozwarty — sterownik zatrzymał ten kanał (który: maska w diagnostyce akcesoriów). Gaśnie sam, gdy obwód wróci; skwitować się go nie da. [D-207]',
+     blok:'ten jeden kanał akcesoriów'},
     {id:'sucho', bit:10, nazwa:'Suchobieg — poziom poniżej progu STOP',
      op:'Poziom spadł poniżej progu STOP; wraca dopiero na progu startu dolewania.',
      blok:'pompę; przerywa też płukanie w każdej fazie, także w trakcie zrzutu'},
@@ -8653,6 +8668,19 @@ const ALARMY_LISTA = [
      blok:null}
   ]]
 ];
+
+/* NAZWA ALARMU Z NUMERU BITU [D-307, Tomasz 2026-09-11: „w alarmach jest tylko nr bez opisu"]: historia alarmów
+   i dziennik zdarzeń dostają ze sterownika sam numer bitu. Alarmy per obieg mają bit obiegu 2 jawnie (`bitW`) albo
+   domyślnie `bit+1` - dotąd dwie lokalne kopie tej funkcji znały tylko `bit`/`bitW`, więc termik wanny (9) wychodził jako
+   „alarm nr 9". Przy dwóch obiegach dopisujemy nazwę obiegu, żeby było wiadomo, o którą pompę chodzi. */
+function almNazwaBit(bit){
+  for (const [g, lista] of ALARMY_LISTA) for (const a of lista){
+    if (a.bit === bit) return a.nazwa + ((!a.sys && N.dwa_obiegi) ? ' · ' + (PRZEZNACZENIA[SRV_S.przezn_dwa[0]] || 'obieg 1') : '');
+    if (!a.sys && ((a.bitW !== undefined ? a.bitW : a.bit + 1) === bit))
+      return a.nazwa + (N.dwa_obiegi ? ' · ' + (PRZEZNACZENIA[SRV_S.przezn_dwa[1]] || 'obieg 2') : '');
+  }
+  return 'alarm nr ' + bit;
+}
 
 /* KTORE OBIEGI ISTNIEJA — z kontraktu, tak samo jak reszta ekranow.
    Przy jednym obiegu wiersz ma JEDEN ptaszek bez nazwy obiegu: pisanie
@@ -9290,7 +9318,7 @@ function zdTekst(w) {
     case 2:  return `temperatura zadana ${obieg}: ${t10(a)}` + (c && c !== 0xFFFF ? ` (było ${t10(c)})` : '');
     case 3:  return `grzanie ${obieg}: ${b ? 'włączone' : 'wyłączone'}`;
     case 4:  return `płukanie ręczne ${obieg}: ${b ? 'przyjęte' : 'odmowa'}`;
-    case 5:  { let n = 'alarm nr ' + a; for (const [g, l] of ALARMY_LISTA) for (const x of l) if (x.bit === a || x.bitW === a) n = x.nazwa; return `skwitowano: ${n}`; }
+    case 5:  return `skwitowano: ${almNazwaBit(a)}`;
     case 6:  return `skasowano zatrzask ${a === 1 ? 'pompy (manometr)' : 'awarii wodnej'} ${obieg}`;
     case 7:  return `obejście ${a === 1 ? 'sondy poziomu' : 'manometru'} ${obieg}: ${b ? 'włączone' : 'wyłączone'}`;
     case 10: return `pompa ${obieg}: ${b ? 'START' : 'STOP'} · HOA ${ZD_HOA[a] || a}` + (c ? ` · ${ZD_FAZA[c] || 'faza ' + c}` : '');
@@ -9456,8 +9484,7 @@ function ekrHistoria(){
      (srv_historia.c): nazwa alarmu + „dd.mm HH:MM · pojawił się / ustąpił" */
   if (window.DUO_CZAS){
     const h = SRV_S.hist, p2 = n => String(n).padStart(2,'0');
-    const nazwa = bit => { for (const [g, lista] of ALARMY_LISTA) for (const a of lista)
-        if (a.bit === bit || a.bitW === bit) return a.nazwa; return 'alarm nr ' + bit; };
+    const nazwa = almNazwaBit;   /* [D-307] wspólna z dziennikiem; zna też bit obiegu 2 */
     const kiedy = t => { if (!t || t < 1735689600) return '— —'; const m = new Date(t * 1000);
         return p2(m.getUTCDate()) + '.' + p2(m.getUTCMonth() + 1) + ' ' + p2(m.getUTCHours()) + ':' + p2(m.getUTCMinutes()); };
     /* TYLKO ALARMY [Tomasz 2026-09-02: „tylko alarmy, ostatnie 30"]:
