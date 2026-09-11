@@ -409,7 +409,14 @@
         }
         if (wynik && wynik[0] === nr && wynik[3] !== 0)
           return { ok: false, opis: 'sterownik ODMOWIL zapisu ' + adr + '=' + val + ' (kod ' + wynik[3] + ')' };
-        ostOpis = 'rejestr ' + adr + ' <- ' + val + (wynik ? '' : ' (bez potwierdzenia)');
+        /*  BRAK POTWIERDZENIA TO NIE JEST SUKCES [D-318, audyt etapu 3 pkt 6; zasada 10].
+            Czekamy dwie sekundy na linię `K;` z numerem NASZEJ komendy. Gdy nie przyjdzie - albo
+            przyjdzie numer dalszy, czyli nasz wynik już przepadł - sterownik mógł wykonać i mógł
+            odmówić, a apka nie wie która. Dawniej wracało wtedy „ok" i użytkownik widział
+            „zrobione" nad rzeczą, która się nie stała. Teraz mówimy prawdę i odsyłamy do ekranu. */
+        if (!wynik || wynik[0] !== nr)
+          return { ok: false, nieznany: true, opis: 'sterownik nie potwierdził zapisu ' + adr + '=' + val + ' - sprawdź na ekranie' };
+        ostOpis = 'rejestr ' + adr + ' <- ' + val;
       }
       return { ok: true, opis: ostOpis };
     },
@@ -754,6 +761,17 @@
       const cisza = !w || !w.kiedy || Date.now() - w.kiedy > 6000;
       if (POL.length > 1 && (cisza || POL.some(c => c.lekki && c.stan.stan !== 'ok')))
         POL.forEach(c => { c.bliz = 0; wepnijCiezkie(c); });
+      /*  LUKA BEZ PEŁNEGO BLOKU = ZASŁONA [D-318, audyt etapu 3 pkt 3]: po dziurze w numeracji
+          w lustrze brakuje zgubionych zmian, a następne paczki lecą dalej - ekran wyglądał więc
+          na świeży, choć część liczb pochodziła sprzed dziury. Pełny blok przychodzi zwykle w pół
+          sekundy, dlatego zasłaniamy dopiero po dwóch (bez migania przy jednej zgubionej paczce)
+          i prosimy jeszcze raz. Zasłonę zdejmuje dopiero świeży pełny blok. */
+      if (w && w.luka && w.lukaOd && Date.now() - w.lukaOd > 2000) {
+        w.zasiew = true; w.lukaOd = Date.now();
+        zapisz('luka bez pełnego bloku - zasłaniam ekran i proszę jeszcze raz');
+        if (wybrany) oglos('pelny');
+        oddaj();
+      }
     }, 1000);
     k.onMessageArrived = m => {
       const cz = m.destinationName.split('/');
@@ -835,7 +853,7 @@
             return;
           }
           _zrodlo.bliz = 0;
-          if (w.seq != null && d.seq !== w.seq + 1) { w.luka = true; if (pref === wybrany) { zapisz('luka seq ' + w.seq + '→' + d.seq); oglos('pelny'); } }   /* luka → pełny blok od ręki; do niego lustro = zasiew */
+          if (w.seq != null && d.seq !== w.seq + 1) { w.luka = true; w.lukaOd = Date.now(); if (pref === wybrany) { zapisz('luka seq ' + w.seq + '→' + d.seq); oglos('pelny'); } }   /* luka → pełny blok od ręki; do niego lustro = zasiew [chwila luki: D-318] */
           w.seq = d.seq;
         }
         if (d.t) zegar[pref] = { czas: d.t, kiedy: Date.now() };
