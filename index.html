@@ -56,12 +56,12 @@
       <p class="mala">Sterownik umie nadawać przez dwa serwery. Podaj drugi, a aplikacja będzie słuchać obu naraz
         i pokaże obiekt niezależnie od tego, którym akurat nadaje. Puste = tylko pierwszy.</p>
       <label for="host2">Serwer 2</label>
-      <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="np. abc.ala.eu-central-1.emqxsl.com">
+      <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = tylko pierwszy serwer">
       <p class="mala">Port dopisuje się po dwukropku, gdy jest inny niż zwykle: HiveMQ 8884, EMQX 8084 (dobieramy sam).</p>
       <label for="user2">Użytkownik 2</label>
-      <input type="text" id="user2" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input type="text" id="user2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = ten sam z dwójką na końcu">
       <label for="pass2">Hasło 2</label>
-      <input type="password" id="pass2" autocomplete="off">
+      <input type="password" id="pass2" autocomplete="off" placeholder="pusto = to samo hasło">
     </details>
     <div class="zapam"><input type="checkbox" id="zap" checked><label for="zap" style="margin:0">zapamiętaj na tym telefonie</label></div>
     <div class="rz"><button type="submit" id="idz">Otwórz HMI</button></div>
@@ -82,7 +82,7 @@
 (function(){
   const el = id => document.getElementById(id);
   const q = new URLSearchParams(location.search);
-  const HOST = 'c5927e26d92d41508c1ea56fea1b6be2.s1.eu.hivemq.cloud';
+  const HOST = 'c5927e26d92d41508c1ea56fea1b6be2.s1.eu.hivemq.cloud', HOST2 = 'i15560b1.ala.us-east-1.emqxsl.com';
   let z = null; try { z = JSON.parse(localStorage.getItem('odbior_mqtt') || 'null'); } catch(e){}
   try { localStorage.setItem('pwa', '1'); } catch(e){}
   /* zapamiętane dane i nikt nie prosił o ekran logowania -> prosto do HMI */
@@ -96,7 +96,9 @@
   el('user').value = slug(el('nazwa').value);
   /* [D-312] konto serwisowe: jawny ptaszek zamiast zgadywania z kształtu loginu; stary zapis bez pola = dawna zasada */
   el('serw').checked = (z && z.serwis !== undefined) ? !!z.serwis : (!!el('user').value && el('user').value.indexOf('-') < 0);
-  el('host2').value = (z && z.host2) || '';   /* drugi broker [D-313] - pusty znaczy „tylko pierwszy" */
+  /* [D-317] drugi broker wypełnia się sam: adres z wbudowanej stałej, konto = to samo z dwójką, hasło to samo.
+     Zapisane wcześniej wartości mają pierwszeństwo; pusty adres znaczy „tylko pierwszy serwer". */
+  el('host2').value = (z && z.host2 !== undefined) ? z.host2 : HOST2;
   el('user2').value = (z && z.user2) || '';
   el('pass2').value = (z && z.pass2) || '';
   el('nazwa').addEventListener('input', () => { el('user').value = slug(el('nazwa').value); });

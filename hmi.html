@@ -1111,7 +1111,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'bac8648920';
+window.APKA_WERSJA = 'a08aecbd73';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1602,7 +1602,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-11 09:01';
+window.HMI_ZBUDOWANO = '2026-09-11 11:47';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5993,9 +5993,12 @@ window.HMI_ZBUDOWANO = '2026-09-11 09:01';
          okres_s liczy „świeżość" pakietu: 3 × tempo, nie 3 × 30 s */
       window.MOST_JS.startMqtt(podajChmura, { host, port: 8884, user, pass, obiekt: _q.get('obiekt') || null,
                                               serwis: (z && z.serwis !== undefined) ? z.serwis : undefined,   /* [D-312] konto serwisowe widzi wszystkie obiekty */
-                                              host2: (z && z.host2) || _q.get('host2') || null,   /* [D-313] drugi broker - apka słucha obu naraz */
-                                              user2: (z && z.user2) || _q.get('user2') || null,
-                                              pass2: (z && z.pass2) || _q.get('pass2') || null,
+                                              /*  DRUGI BROKER SAM SIĘ UKŁADA [D-317]: nazwy kont mają zasadę - na zapasowym to ten sam
+                                                  login z dwójką i to samo hasło (Master/Master2, wanna-gliczarow/2, sadzawka-chelmska/2).
+                                                  Zapisane wartości mają pierwszeństwo; pusty adres w logowaniu = tylko pierwszy serwer. */
+                                              host2: (z && z.host2 !== undefined) ? z.host2 : (_q.get('host2') || 'i15560b1.ala.us-east-1.emqxsl.com'),
+                                              user2: (z && z.user2) || _q.get('user2') || (user ? user + '2' : null),
+                                              pass2: (z && z.pass2) || _q.get('pass2') || pass,
                                               okres_s: 2, tempo_ms: +(_q.get('tempo') || 1000) });
     };
     if (window.Paho) start();
