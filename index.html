@@ -50,6 +50,8 @@
       <label for="user">Użytkownik brokera</label>
       <input type="text" id="user" autocapitalize="off" autocorrect="off" spellcheck="false" readonly>
       <p class="mala">Użytkownik brokera powstaje z nazwy: małe litery bez polskich znaków, spacje → myślnik.</p>
+      <label class="zapam" style="margin-top:10px"><input type="checkbox" id="serw"> konto serwisowe — widzę wszystkie sterowniki</label>
+      <p class="mala">Zaznacz TYLKO na własnym telefonie. Konto klienta widzi jeden obiekt — ten, którego nazwę podał serwis.</p>
     </details>
     <div class="zapam"><input type="checkbox" id="zap" checked><label for="zap" style="margin:0">zapamiętaj na tym telefonie</label></div>
     <div class="rz"><button type="submit" id="idz">Otwórz HMI</button></div>
@@ -82,6 +84,8 @@
   const slug = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   el('nazwa').value = (z && z.nazwa) || q.get('nazwa') || ((z && z.user) ? z.user : '');
   el('user').value = slug(el('nazwa').value);
+  /* [D-312] konto serwisowe: jawny ptaszek zamiast zgadywania z kształtu loginu; stary zapis bez pola = dawna zasada */
+  el('serw').checked = (z && z.serwis !== undefined) ? !!z.serwis : (!!el('user').value && el('user').value.indexOf('-') < 0);
   el('nazwa').addEventListener('input', () => { el('user').value = slug(el('nazwa').value); });
 
   if ('serviceWorker' in navigator) {
@@ -115,8 +119,9 @@
     let gotowe = false;
     const koniec = (ok, txt) => { if (gotowe) return; gotowe = true; el('idz').disabled = false;
       stan.className = 'stan ' + (ok ? 'ok' : 'zle'); stan.textContent = txt;
-      if (ok) { try { if (el('zap').checked) localStorage.setItem('odbior_mqtt', JSON.stringify({ host, user, pass, nazwa }));
-                      else sessionStorage.setItem('odbior_mqtt_tmp', JSON.stringify({ host, user, pass, nazwa })); } catch(e){}
+      if (ok) { const serwis = el('serw').checked;
+                try { if (el('zap').checked) localStorage.setItem('odbior_mqtt', JSON.stringify({ host, user, pass, nazwa, serwis }));
+                      else sessionStorage.setItem('odbior_mqtt_tmp', JSON.stringify({ host, user, pass, nazwa, serwis })); } catch(e){}
                 setTimeout(() => location.href = 'hmi.html?mqtt=1', 400); } };
     setTimeout(() => koniec(false, 'Broker nie odpowiada w 8 s — sprawdź zasięg i nazwę serwera.'), 8000);
     try {

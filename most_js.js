@@ -473,8 +473,14 @@
         prefiks wpisuje się w sterowniku (serwis → sieć). Konto bez myślnika (serwisowe: „sterownik") widzi wszystko.
         To filtr po stronie apki; twarde odcięcie tematów per konto da dopiero ACL na własnym Mosquitto. */
     if (!o.temat) { const u = String(o.user || ''); const i = u.indexOf('-');
-      if (i > 0) { o.temat = 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1); if (!o.obiekt) o.obiekt = o.temat; }
-      else o.temat = 'basen/+/+'; }
+      /*  KTO WIDZI CO [D-312]: `serwis` przychodzi z logowania (ptaszek „konto serwisowe"). Gdy go nie ma - zapis
+          sprzed 11.09 - zostaje stara zasada (login bez myślnika = serwisowy), żeby zapamiętane logowanie nie padło.
+          ⚠ Sama zasada była dziurawa: klient o jednoczłonowej nazwie („Sadzawka") dostawał widok na wszystkie obiekty. */
+      const serw = (o.serwis === undefined || o.serwis === null) ? (i <= 0) : !!o.serwis;
+      if (serw) o.temat = 'basen/+/+';
+      else if (i > 0) { o.temat = 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1); if (!o.obiekt) o.obiekt = o.temat; }
+      else o.temat = 'basen/' + u + '/+'; }   /* konto jednoczłonowe bez ptaszka: własna gałąź, nie cały broker */
+    M.zakres = o.temat;   /* [D-312] widoczne dla sond i diagnostyki: co to konto ogląda */
     /*  KOMENDY PRZEZ BROKER [D-267, Tomasz: „apka nie musi mieć uprawnień, bo
         serwis za PIN-em, a reszta dla klienta"]. fetch('/cmd?co=…') z makiety
         tłumaczymy jak dla AP (komendaNaZapisy → lista zapisów rejestrów) i
@@ -613,6 +619,8 @@
     const ost = { zm: 0, blok: 0, zadanie: 0 };
     const zapisz = txt => { M.dziennik.push({ t: Date.now(), txt }); if (M.dziennik.length > 60) M.dziennik.shift(); };
     zapisz('start klienta ' + (window.APKA_WERSJA || '(bez wersji)') + ' → ' + o.host);
+    /* [D-312] w dzienniku łącza widać, CO to konto ogląda - inaczej „nie widzę obiektu" i „nie mam uprawnień" wyglądają tak samo */
+    zapisz('zakres kont' + 'a: ' + o.temat + (o.temat === 'basen/+/+' ? ' (serwisowe - wszystkie sterowniki)' : ' (jeden obiekt)'));
     const wydawcy = () => { const w = {}; for (const p in obiekty)
       w[p] = { status: obiekty[p].status || '?', wiek_s: obiekty[p].kiedy ? (Date.now() - obiekty[p].kiedy) / 1000 : null }; return w; };
     let czekamPoPowrocie = false;        /* od powrotu na ekran / zerwania do pierwszej paczki [D-279] */
