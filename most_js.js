@@ -623,6 +623,18 @@
     const pamiec = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
     let wybrany = o.obiekt || pamiec('mqtt_obiekt') || null;
     const cid = 'hmi-' + Math.random().toString(16).slice(2, 10);
+    /*  UCHWYT DO GNIAZDA [D-310]: Paho nie udostępnia swojego WebSocketa, a po odmrożeniu karty trzeba móc zamknąć
+        gniazdo, które zostało „w locie" - inaczej `connect()` odbija się aż do jego własnego limitu czasu (10 s),
+        a po nim czeka jeszcze odstęp rosnący do 128 s. Opakowanie jest przezroczyste: tworzy prawdziwy WebSocket
+        i tylko zapamiętuje ostatni. Strona nie ma innych WebSocketów (reszta to fetch i SSE). */
+    try { const OWS = window.WebSocket;
+      if (OWS && !OWS._opakowany) {
+        const WSo = function (u, pr) { const s = (pr === undefined) ? new OWS(u) : new OWS(u, pr); M._gniazdo = s; return s; };
+        WSo.prototype = OWS.prototype; WSo._opakowany = true;
+        ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(n => { WSo[n] = OWS[n]; });
+        window.WebSocket = WSo;
+      }
+    } catch (e) {}
     const k = new Klient(o.host, o.port || 8884, '/mqtt', cid);
     /*  `nowe` [D-280]: prawda tylko, gdy oddaj() woła świeża paczka (zm/blok) albo zmiana obiektu.
         Cykliczne oddaj() co 1 s liczy wiek i stan brokera, ale ekran NIE dostaje wtedy świata -
@@ -669,11 +681,19 @@
       czekamPoPowrocie = true; oddaj();
       if (k && !k.isConnected()) {
         broker = { stan: 'laczy', opis: 'łączę ponownie…' };
-        try { k.connect(opcje); zapisz('połączenie od razu po powrocie'); } catch (e) { zapisz('po powrocie: ' + pahoTekst(e)); }
+        odstepNr = 0; polaczTeraz('powrót na ekran');
         oddaj();
       } else oglosTeraz();
     });
     window.addEventListener('focus', oglosTeraz);
+    /*  ⚠ W DZIENNIKU Z TELEFONU NIE BYŁO WPISU „w tle" [D-310], choć karta stała 7 min w tle: Chrome na Androidzie
+        potrafi ZAMROZIĆ kartę (freeze) bez zdarzenia `visibilitychange` - wtedy nie wykona się żaden nasz kod.
+        Te trzy zdarzenia zostawiają ślad, kiedy karta zasnęła i kiedy wstała; `resume` dodatkowo łączy od ręki,
+        bo po zamrożeniu `visibilitychange` bywa nie do zobaczenia. */
+    window.addEventListener('pagehide', () => zapisz('karta schowana (pagehide)'));
+    document.addEventListener('freeze', () => zapisz('karta zamrożona przez przeglądarkę'));
+    document.addEventListener('resume', () => { zapisz('karta odmrożona'); czekamPoPowrocie = true;
+      if (k && !k.isConnected()) { broker = { stan: 'laczy', opis: 'łączę ponownie…' }; odstepNr = 0; polaczTeraz('odmrożenie'); } oddaj(); });
     setInterval(() => { const w = wybrany && obiekty[wybrany];
       if (broker.stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 4000) oglosTeraz(); }, 1000);
     k.onMessageArrived = m => {
@@ -777,31 +797,70 @@
       /* 0011E „Invalid state" = wyjątek z connect()/send() w złym stanie - u nas: connect() po powrocie na ekran, gdy Paho
          właśnie sam łączy ponownie [Tomasz 02:30: „albo z końcówką 11E"]; informacja, nie błąd */
       if (/AMQJS0011E/.test(m)) return /already connect/i.test(m) ? 'ponowne łączenie już trwa (Paho łączy sam)' : /not connect/i.test(m) ? 'jeszcze bez połączenia' : 'zły stan klienta: ' + m.replace(/^AMQJS0011E\s*/, '');
-      if (/AMQJS0008I/.test(m)) return 'broker zamknął połączenie';
+      if (/AMQJS0008I/.test(m)) return 'połączenie zamknięte' + (document.visibilityState === 'hidden' ? ' (telefon w tle)' : ' (telefon na ekranie: sieć albo broker)');
       if (/AMQJS0004E/.test(m)) return 'broker nie odpowiedział na ping (zasięg?)';
       if (/AMQJSC0001E/.test(m)) return 'brak odpowiedzi brokera (limit czasu)';
       if (/AMQJS0006E/.test(m)) return 'broker odrzucił połączenie' + (rcZ(r) !== null ? ' (kod ' + rcZ(r) + ')' : '');
       return m.replace(/^AMQJS[C]?\d+[EI]\s*/, '') || 'powód nieznany'; };
-    let zerwaneOd = 0;
-    k.onConnectionLost = r => { const co = pahoTekst(r); zerwaneOd = Date.now();
-      broker = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' }; czekamPoPowrocie = true; zapisz('zerwane: ' + co); oddaj(); };
-    /*  RECONNECT [2026-09-09]: telefon zmienia sieć (WiFi→LTE), ekran gaśnie, tunel pada -
-        Paho z `reconnect:true` wraca sam (odstęp 1→128 s), a onSuccess leci przy KAŻDYM
-        CONNACK, więc subskrypcje wracają razem z nim (cleanSession:true je kasuje).
-        onConnected(ponownie) tylko podpisuje stan na pasku. */
-    /* po PONOWNYM połączeniu prosimy o pełny blok: w czasie przerwy paczki zmian przepadły, a retained
-       blok bywa do 60 s stary [D-278] */
-    k.onConnected = ponownie => { const przerwa = (ponownie && zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - zerwaneOd) / 1000) + ' s)' : ''; zerwaneOd = 0;
-      broker = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' }; zapisz(ponownie ? 'połączony ponownie' + przerwa : 'połączony'); if (ponownie && wybrany) oglos('pelny'); oddaj(); };
+    let zerwaneOd = 0, byloWTle = false, byloZerwane = false;
+    /*  PONAWIANIE JEST NASZE, NIE PAHO [D-310] - `reconnect:false` w opcjach niżej.
+        Dlaczego: z `reconnect:true` biblioteka po zamrożeniu karty zostaje ze stanem „łączę ponownie"
+        i martwym gniazdem, z którego nie ma wyjścia jej własnym API (connect rzuca „already connected",
+        zamknięcie gniazda jest wtedy ignorowane, a disconnect wywala się na pustym zegarze) - czekało się
+        na jej limit czasu i odstęp, czyli kilkanaście sekund po każdym powrocie do apki.
+        Teraz: każdy powód (zerwane, nieudana próba, powrót na ekran, odmrożenie) prowadzi do jednej
+        drogi - `polaczTeraz`. Odstępy 1, 2, 5, 10, 20, 30, 60 s; powrót na ekran zeruje je i próbuje od razu. */
+    const ODSTEPY = [1, 2, 5, 10, 20, 30, 60];
+    let odstepNr = 0, ponowZegar = null;
+    const ponowPozniej = powod => {
+      const sek = ODSTEPY[Math.min(odstepNr, ODSTEPY.length - 1)]; odstepNr++;
+      if (ponowZegar) clearTimeout(ponowZegar);
+      ponowZegar = setTimeout(() => { ponowZegar = null; polaczTeraz(powod); }, sek * 1000);
+      return sek;
+    };
+    let ostProba = 0;
+    const polaczTeraz = powod => {
+      if (!k || k.isConnected()) return;
+      /* ⚠ nie dobijamy brokera: seria zdarzeń (powrót + odmrożenie + zerwanie w tej samej chwili) ma dać JEDNĄ próbę */
+      const teraz = Date.now(); if (teraz - ostProba < 1500) return; ostProba = teraz;
+      if (ponowZegar) { clearTimeout(ponowZegar); ponowZegar = null; }
+      try { k.connect(opcje); broker = { stan: 'laczy', opis: 'łączę z brokerem…' }; oddaj(); return; }
+      catch (e) {
+        /*  gniazdo poprzedniej próby wisi (zamrożone razem z kartą): zamykamy je i wołamy obsługę zamknięcia,
+            którą Paho sam do niego podpiął - biblioteka od razu wie, że gniazda nie ma. Bez tego czekałaby
+            pełny własny limit czasu. Przy `reconnect:false` ta droga zawsze działa. */
+        try { const g = M._gniazdo;
+          if (g) { try { g.close(); } catch (e2) {} if (typeof g.onclose === 'function') g.onclose({ code: 1006, wasClean: false }); }
+        } catch (e3) {}
+        try { k.connect(opcje); broker = { stan: 'laczy', opis: 'łączę z brokerem…' }; zapisz('gniazdo w locie zamknięte - łączę (' + powod + ')'); oddaj(); return; }
+        catch (e4) { const s = ponowPozniej(powod); zapisz('próba za ' + s + ' s (' + pahoTekst(e4) + ')'); }
+      }
+    };
+    k.onConnectionLost = r => { const co = pahoTekst(r); zerwaneOd = Date.now(); byloZerwane = true;
+      byloWTle = (document.visibilityState === 'hidden');
+      broker = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' }; czekamPoPowrocie = true; zapisz('zerwane: ' + co); oddaj();
+      odstepNr = 0; polaczTeraz('zerwane');   /* od razu; gdy sieci nie ma, próba padnie i pójdą odstępy */
+    };
+    /*  PO KAŻDYM POŁĄCZENIU: `onSuccess` (subskrypcje - cleanSession je kasuje przy zerwaniu) leci przy KAŻDYM
+        CONNACK, a `onConnected` podpisuje pasek. Czy to POWRÓT po zerwaniu, wiemy z własnej flagi `byloZerwane`
+        - Paho przy `reconnect:false` zawsze podaje „pierwsze połączenie" [D-310]. */
+    k.onConnected = () => {
+      const ponownie = byloZerwane;
+      const przerwa = (ponownie && zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - zerwaneOd) / 1000) + ' s' + (byloWTle ? ', telefon był w tle' : '') + ')' : '';
+      zerwaneOd = 0; byloWTle = false; byloZerwane = false; odstepNr = 0;
+      if (ponowZegar) { clearTimeout(ponowZegar); ponowZegar = null; }
+      broker = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
+      zapisz(ponownie ? 'połączony ponownie' + przerwa : 'połączony');
+      if (ponownie && wybrany) oglos('pelny');   /* w czasie przerwy paczki zmian przepadły, retained blok bywa 60 s stary [D-278] */
+      oddaj();
+    };
     /*  POWOD ODMOWY Z CONNACK [2026-09-09]: Paho w onFailure daje errorCode = numer WŁASNEGO błędu
         (6 = „Bad Connack return code"), a kod brokera (4 = złe hasło, 5 = brak uprawnień, 3 = broker
         niedostępny) siedzi tylko w treści komunikatu - stąd wyrażenie. Dawne `errorCode === 5`
         nigdy nie było prawdą i złe hasło wyglądało jak „broker nie odpowiada".
-        PONAWIANIE: `reconnect:true` Paho działa dopiero po ZERWANIU udanego połączenia; pierwsza
-        nieudana próba (telefon bez zasięgu przy otwarciu) zostawałaby na zawsze. Ponawiamy sami
-        5→10→20→40→60 s; przy złych danych logowania NIE ponawiamy - to człowiek musi poprawić. */
-    let odstepPonow = 5;
-    const opcje = { useSSL: true, userName: o.user, password: o.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: true,
+        PONAWIANIE robi `polaczTeraz`/`ponowPozniej` wyżej (D-310) - także po pierwszej nieudanej próbie
+        (telefon bez zasięgu przy otwarciu apki), której Paho sam nigdy nie ponawia. */
+    const opcje = { useSSL: true, userName: o.user, password: o.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: false,
       onSuccess: () => { k.subscribe((o.temat || 'basen/+/+') + '/blok', { qos: 0 });
                          k.subscribe((o.temat || 'basen/+/+') + '/zm', { qos: 1 });      // paczki zmian [D-277]
                          k.subscribe((o.temat || 'basen/+/+') + '/status', { qos: 0 });  // lista obiektów (retained) - TU, nie po 500 ms
@@ -815,12 +874,12 @@
                          if (wybrany) oglos(tempo); },
       onFailure: r => {
         const rc = rcZ(r);
-        if (rc === 4 || rc === 5) { broker = { stan: 'blad', opis: 'broker odmówił - złe dane logowania (użytkownik/hasło)' }; oddaj(); return; }
+        /* ZŁE DANE LOGOWANIA NIE PONAWIAJĄ SIĘ - to człowiek musi poprawić (inaczej broker blokuje konto za dobijanie) */
+        if (rc === 4 || rc === 5) { broker = { stan: 'blad', opis: 'broker odmówił - złe dane logowania (użytkownik/hasło)' }; zapisz('odmowa: złe dane logowania'); oddaj(); return; }
         const powod = rc === 3 ? 'broker niedostępny' : rc === 1 || rc === 2 ? 'broker odrzucił klienta (kod ' + rc + ')'
                     : 'broker nie odpowiada (brak zasięgu?)';
-        broker = { stan: 'blad', opis: powod + ' - ponowna próba za ' + odstepPonow + ' s' }; zapisz('odmowa: ' + powod); oddaj();
-        setTimeout(() => { broker = { stan: 'laczy', opis: 'łączę z brokerem…' }; oddaj(); try { k.connect(opcje); } catch (e) {} }, odstepPonow * 1000);
-        odstepPonow = Math.min(60, odstepPonow * 2);
+        const sek = ponowPozniej('nieudana próba');
+        broker = { stan: 'blad', opis: powod + ' - ponowna próba za ' + sek + ' s' }; zapisz('odmowa: ' + powod + ' - próba za ' + sek + ' s'); oddaj();
       } };
     /*  ZIMNY START Z PAMIĘCI TELEFONU [D-289, C4]: ostatni pełny blok wybranego obiektu leży w localStorage.
         Otwarcie apki = liczby OD RAZU pod zasłoną „łączę…/pobieram stan…" (zasiew), nie ciemna plansza;
