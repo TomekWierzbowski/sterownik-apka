@@ -48,8 +48,9 @@
       <label for="host">Serwer (broker)</label>
       <input type="text" id="host" autocapitalize="off" autocorrect="off" spellcheck="false">
       <label for="user">Użytkownik brokera</label>
-      <input type="text" id="user" autocapitalize="off" autocorrect="off" spellcheck="false" readonly>
-      <p class="mala">Użytkownik brokera powstaje z nazwy: małe litery bez polskich znaków, spacje → myślnik.</p>
+      <input type="text" id="user" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <p class="mala">Powstaje z nazwy: małe litery bez polskich znaków, spacje → myślnik. Możesz go poprawić —
+      broker <b>rozróżnia wielkie i małe litery</b>, więc konto „Master" trzeba wpisać dokładnie tak.</p>
       <label class="zapam" style="margin-top:10px"><input type="checkbox" id="serw"> konto serwisowe — widzę wszystkie sterowniki</label>
       <p class="mala">Zaznacz TYLKO na własnym telefonie. Konto klienta widzi jeden obiekt — ten, którego nazwę podał serwis.</p>
       <b style="display:block;margin-top:14px">Drugi serwer (zapasowy)</b>
@@ -93,7 +94,7 @@
      własne konto na brokerze (dziś HiveMQ: konta w konsoli; docelowo Mosquitto na HA z ACL na prefiks tematu). */
   const slug = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   el('nazwa').value = (z && z.nazwa) || q.get('nazwa') || ((z && z.user) ? z.user : '');
-  el('user').value = slug(el('nazwa').value);
+  el('user').value = (z && z.user) ? z.user : slug(el('nazwa').value);
   /* [D-312] konto serwisowe: jawny ptaszek zamiast zgadywania z kształtu loginu; stary zapis bez pola = dawna zasada */
   el('serw').checked = (z && z.serwis !== undefined) ? !!z.serwis : (!!el('user').value && el('user').value.indexOf('-') < 0);
   /* [D-317] drugi broker wypełnia się sam: adres z wbudowanej stałej, konto = to samo z dwójką, hasło to samo.
@@ -101,7 +102,12 @@
   el('host2').value = (z && z.host2 !== undefined) ? z.host2 : HOST2;
   el('user2').value = (z && z.user2) || '';
   el('pass2').value = (z && z.pass2) || '';
-  el('nazwa').addEventListener('input', () => { el('user').value = slug(el('nazwa').value); });
+  /*  [D-326] NAZWA PRZESTAJE NADPISYWAC RECZNIE WPISANEGO UZYTKOWNIKA. Konto serwisowe nazywa sie
+      „Master" z wielkiej litery, a `slug()` robi z tego „master" - broker odpowiada wtedy „brak
+      uprawnien" (sprawdzone na obu: HiveMQ i EMQX). Kto raz poprawi pole, ten wie, co robi. */
+  let userRecznie = false;
+  el('user').addEventListener('input', () => { userRecznie = (el('user').value.trim() !== ''); });
+  el('nazwa').addEventListener('input', () => { if (!userRecznie) el('user').value = slug(el('nazwa').value); });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => {
@@ -124,7 +130,9 @@
                  4: 'zły użytkownik lub hasło', 5: 'brak uprawnień dla tego użytkownika' };
   el('f').onsubmit = ev => {
     ev.preventDefault();
-    const host = el('host').value.trim(), nazwa = el('nazwa').value.trim(), user = slug(nazwa), pass = el('pass').value;
+    const host = el('host').value.trim(), nazwa = el('nazwa').value.trim(), pass = el('pass').value;
+    /*  [D-326] bierzemy to, CO STOI W POLU (może być poprawione ręcznie), a gdy puste - liczymy z nazwy */
+    const user = el('user').value.trim() || slug(nazwa);
     const stan = el('stan'); stan.className = 'stan';
     if (!host || !user || !pass) { stan.className = 'stan zle'; stan.textContent = 'Wpisz nazwę sterownika i hasło.'; return; }
     const Klient = window.Paho && (Paho.Client || (Paho.MQTT && Paho.MQTT.Client));
