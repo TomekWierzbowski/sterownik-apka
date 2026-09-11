@@ -652,9 +652,19 @@
         ponawianie na każdy, a `zadanie` i komendy idą do tego brokera, którym dany obiekt PRZYSZEDŁ
         (`obiekty[pref].kl`). Dzięki temu przełączenie sterownika na awaryjny jest dla patrzącego niewidoczne,
         a konto serwisowe widzi w jednej apce obiekty z HiveMQ i z własnego brokera naraz. */
-    const POL = [{ nr: 1, host: o.host, port: o.port || 8884, user: o.user, pass: o.pass, temat: o.temat }];
-    if (o.host2 && o.user2) POL.push({ nr: 2, host: o.host2, port: o.port2 || 8884, user: o.user2, pass: o.pass2,
-                                       temat: o.temat2 || zakresZ(o.user2, o.serwis2 !== undefined ? o.serwis2 : o.serwis) });
+    /*  PORT W ADRESIE [D-314, Tomasz 2026-09-11: „drugi na EMQX"]: brokery nie zgadzają się co do portu WebSocketu -
+        HiveMQ Cloud słucha na 8884, EMQX Cloud na 8084. Dlatego adres wolno podać jako `host:port`; bez portu
+        bierzemy 8884 (HiveMQ), a dla adresów EMQX (`*.emqxsl.com`) 8084, żeby nie trzeba było pamiętać liczby.
+        ⚠ To port dla PRZEGLĄDARKI (WebSocket po TLS). Sterownik łączy się natywnym MQTT: HiveMQ i EMQX 8883. */
+    const adres = (txt, domyslny) => { const s = String(txt || '').trim().replace(/^wss?:\/\//, '').replace(/\/.*$/, '');
+      const i = s.lastIndexOf(':');
+      if (i > 0 && /^\d+$/.test(s.slice(i + 1))) return { host: s.slice(0, i), port: +s.slice(i + 1) };
+      return { host: s, port: domyslny || (/emqxsl\.com$/i.test(s) ? 8084 : 8884) }; };
+    const a1 = adres(o.host, o.port);
+    const POL = [{ nr: 1, host: a1.host, port: a1.port, user: o.user, pass: o.pass, temat: o.temat }];
+    if (o.host2 && o.user2) { const a2 = adres(o.host2, o.port2);
+      POL.push({ nr: 2, host: a2.host, port: a2.port, user: o.user2, pass: o.pass2,
+                 temat: o.temat2 || zakresZ(o.user2, o.serwis2 !== undefined ? o.serwis2 : o.serwis) }); }
     POL.forEach((c, i) => { c.kl = new Klient(c.host, c.port, '/mqtt', cid + (i ? '-' + (i + 1) : ''));
                             c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; });
     const k = POL[0].kl;                    /* pierwszy broker = główny; skrót dla czytelności niżej */
