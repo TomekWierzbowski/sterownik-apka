@@ -669,7 +669,7 @@
       czekamPoPowrocie = true; oddaj();
       if (k && !k.isConnected()) {
         broker = { stan: 'laczy', opis: 'łączę ponownie…' };
-        try { k.connect(opcje); zapisz('połączenie od razu po powrocie'); } catch (e) { zapisz('connect po powrocie: ' + (e && e.message || e)); }
+        try { k.connect(opcje); zapisz('połączenie od razu po powrocie'); } catch (e) { zapisz('po powrocie: ' + pahoTekst(e)); }
         oddaj();
       } else oglosTeraz();
     });
@@ -772,8 +772,11 @@
         (telefon w tle, zmiana WiFi→LTE, chwilowy brak zasięgu) - Paho wraca sam, więc to informacja, nie błąd.
         Zapamiętujemy chwilę zerwania, żeby przy powrocie dopisać, ile trwała przerwa (dane do prób brzegowych). */
     const rcZ = r => { const m = /return code:\s*(\d)/i.exec((r && r.errorMessage) || ''); return m ? +m[1] : null; };
-    const pahoTekst = r => { const m = (r && r.errorMessage) || String((r && r.errorCode) || '');
+    const pahoTekst = r => { const m = (r && (r.errorMessage || r.message)) || String((r && r.errorCode) || r || '');
       if (/AMQJS0007E/.test(m)) return 'gniazdo zerwane przez system (tło / zmiana sieci / zasięg)';
+      /* 0011E „Invalid state" = wyjątek z connect()/send() w złym stanie - u nas: connect() po powrocie na ekran, gdy Paho
+         właśnie sam łączy ponownie [Tomasz 02:30: „albo z końcówką 11E"]; informacja, nie błąd */
+      if (/AMQJS0011E/.test(m)) return /already connect/i.test(m) ? 'ponowne łączenie już trwa (Paho łączy sam)' : /not connect/i.test(m) ? 'jeszcze bez połączenia' : 'zły stan klienta: ' + m.replace(/^AMQJS0011E\s*/, '');
       if (/AMQJS0008I/.test(m)) return 'broker zamknął połączenie';
       if (/AMQJS0004E/.test(m)) return 'broker nie odpowiedział na ping (zasięg?)';
       if (/AMQJSC0001E/.test(m)) return 'brak odpowiedzi brokera (limit czasu)';
