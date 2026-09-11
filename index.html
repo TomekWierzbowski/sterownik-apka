@@ -138,7 +138,13 @@
     const Klient = window.Paho && (Paho.Client || (Paho.MQTT && Paho.MQTT.Client));
     if (!Klient) { stan.className = 'stan zle'; stan.textContent = 'Brak biblioteki MQTT (paho-mqtt.min.js) — odśwież stronę przy zasięgu.'; return; }
     el('idz').disabled = true; stan.textContent = 'Łączę z brokerem…';
-    const k = new Klient(host, 8884, '/mqtt', 'apka-' + Math.random().toString(16).slice(2, 10));
+    /*  PORT Z ADRESU, NIE NA SZTYWNO [D-327]: było tu wpisane 8884 (HiveMQ), więc adres EMQX
+        (8084) nie miał szans przejść próby. Ta sama zasada, co w most_js: port po dwukropku
+        wygrywa, potem rozpoznajemy dostawcę, a na końcu zostaje HiveMQ. */
+    const adres = (txt, domyslny) => { const s = String(txt || '').trim().replace(/^wss?:\/\//, '').replace(/\/.*$/, '');
+      const i = s.lastIndexOf(':');
+      if (i > 0 && /^\d+$/.test(s.slice(i + 1))) return { host: s.slice(0, i), port: +s.slice(i + 1) };
+      return { host: s, port: domyslny || (/emqxsl\.com$/i.test(s) ? 8084 : 8884) }; };
     let gotowe = false;
     const koniec = (ok, txt) => { if (gotowe) return; gotowe = true; el('idz').disabled = false;
       stan.className = 'stan ' + (ok ? 'ok' : 'zle'); stan.textContent = txt;
@@ -148,15 +154,32 @@
                 try { if (el('zap').checked) localStorage.setItem('odbior_mqtt', JSON.stringify(dane));
                       else sessionStorage.setItem('odbior_mqtt_tmp', JSON.stringify(dane)); } catch(e){}
                 setTimeout(() => location.href = 'hmi.html?mqtt=1', 400); } };
-    setTimeout(() => koniec(false, 'Broker nie odpowiada w 8 s — sprawdź zasięg i nazwę serwera.'), 8000);
-    try {
-      k.connect({ useSSL: true, userName: user, password: pass, timeout: 7, cleanSession: true,
-        onSuccess: () => { try { k.disconnect(); } catch(e){} koniec(true, 'Połączono. Otwieram HMI…'); },
-        /* kod CONNACK brokera (4 złe hasło, 5 brak uprawnień, 3 niedostępny) jest w TREŚCI komunikatu Paho,
-           errorCode to numer błędu biblioteki (6 = „Bad Connack") - stąd wyrażenie [2026-09-09] */
-        onFailure: r => { const m = /return code:\s*(\d)/i.exec((r && r.errorMessage) || ''); const rc = m ? +m[1] : (r && r.errorCode);
-          koniec(false, (KODY[rc] || 'nie udało się połączyć') + (r && r.errorMessage ? ' (' + r.errorMessage + ')' : '')); } });
-    } catch (e) { koniec(false, 'Błąd połączenia: ' + e); }
+    setTimeout(() => koniec(false, 'Żaden serwer nie odpowiada w 9 s — sprawdź zasięg i nazwę serwera.'), 9000);
+    /*  PRÓBUJEMY OBU SERWERÓW NARAZ [D-327, uwaga z audytu]: aplikacja od D-313 słucha dwóch brokerów,
+        ale te drzwi sprawdzały tylko pierwszy - jego awaria zamykała wejście, choć drugi działał.
+        Wpuszczamy, gdy KTÓRYKOLWIEK wpuści; gdy oba odmówią, pokazujemy, co powiedział pierwszy
+        (a jeśli milczał - co powiedział drugi). Dane zapisujemy te same, co dotąd. */
+    const drugi = { host: el('host2').value.trim(), user: el('user2').value.trim() || (user ? user + '2' : ''),
+                    pass: el('pass2').value || pass };
+    const proby = [{ nazwa: 'serwer 1', host: host, user: user, pass: pass }];
+    if (drugi.host && drugi.user) proby.push({ nazwa: 'serwer 2', host: drugi.host, user: drugi.user, pass: drugi.pass });
+    let odmowy = [], ile_odp = 0;
+    proby.forEach(pr => {
+      const a = adres(pr.host);
+      let kl;
+      try { kl = new Klient(a.host, a.port, '/mqtt', 'apka-' + Math.random().toString(16).slice(2, 10)); }
+      catch (e) { ile_odp++; odmowy.push(pr.nazwa + ': ' + e); return; }
+      try {
+        kl.connect({ useSSL: true, userName: pr.user, password: pr.pass, timeout: 7, cleanSession: true,
+          onSuccess: () => { try { kl.disconnect(); } catch(e){}
+            koniec(true, 'Połączono (' + pr.nazwa + '). Otwieram HMI…'); },
+          /* kod CONNACK brokera (4 złe hasło, 5 brak uprawnień, 3 niedostępny) jest w TREŚCI komunikatu Paho,
+             errorCode to numer błędu biblioteki (6 = „Bad Connack") - stąd wyrażenie [2026-09-09] */
+          onFailure: r => { const m = /return code:\s*(\d)/i.exec((r && r.errorMessage) || ''); const rc = m ? +m[1] : (r && r.errorCode);
+            odmowy.push(pr.nazwa + ': ' + (KODY[rc] || 'nie udało się połączyć'));
+            if (++ile_odp >= proby.length) koniec(false, odmowy.join(' · ')); } });
+      } catch (e) { ile_odp++; odmowy.push(pr.nazwa + ': ' + e); if (ile_odp >= proby.length) koniec(false, odmowy.join(' · ')); }
+    });
   };
 })();
 </script>

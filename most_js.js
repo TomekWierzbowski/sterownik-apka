@@ -730,14 +730,23 @@
       return (c && c.kl && c.kl.isConnected() && c.stan.stan === 'ok') ? c.nr : 0;
     };
     let niesieOst = -1;
-    const oglos = (v, niesie) => { const kk = klGot(wybrany); if (!wybrany || !kk) return;
+    const oglos = (v, niesie) => { if (!wybrany) return;
       let tresc = String(v);
       if (typeof v === 'number') {                     /* dopisek tylko przy tempie, nie przy „pelny"/„okres:" */
         const nr = (niesie === undefined) ? niesieNr() : niesie;
         tresc += ';niesie=' + nr;
         if (nr !== niesieOst) { niesieOst = nr; zapisz(nr ? 'proszę o ciężkie tematy serwerem ' + nr : 'proszę o ciężkie tematy OBOMA serwerami'); }
       }
-      const m = new Paho.Message(tresc); m.destinationName = wybrany + '/zadanie'; kk.send(m); ost.zadanie = Date.now(); if (v === 'pelny') zapisz('żądanie pełnego bloku'); };
+      /*  ŻĄDANIE IDZIE WSZYSTKIMI DROGAMI [D-327, uwaga z audytu]: dotąd szło tylko tą, którą uważamy
+          za niosącą. Gdy sterownik straci WŁAŚNIE tego brokera, prośba leci w próżnię, a sterownik
+          dowie się o stracie dopiero po swoim keepalive - i przez ten czas nie wie, że ma wrócić do
+          nadawania oboma. Powtórkę tej samej treści sterownik odsiewa w oknie 3 s [D-319], więc to
+          nic nie kosztuje poza kilkudziesięcioma bajtami. */
+      let poszlo = 0;
+      POL.forEach(c => { if (!c.kl.isConnected()) return;
+        try { const m = new Paho.Message(tresc); m.destinationName = wybrany + '/zadanie'; c.kl.send(m); poszlo++; } catch (e) {} });
+      if (!poszlo) return;
+      ost.zadanie = Date.now(); if (v === 'pelny') zapisz('żądanie pełnego bloku'); };
     setInterval(() => oglos(tempo), 20000);
     /* `zadanie`=0 przy pagehide ZDJĘTE [D-287]: jeden schodzący do tła podglądacz gasił strumień pozostałym; sterownik gaśnie sam 60 s po ostatnim odnowieniu */
     /*  WZNOWIENIE PODGLĄDU BEZ CZEKANIA [2026-09-09, Tomasz: „jak nie dostanie pakietu na czas,
