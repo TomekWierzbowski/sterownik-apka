@@ -625,7 +625,10 @@
     const wydawcy = () => { const w = {}; for (const p in obiekty)
       w[p] = { status: obiekty[p].status || '?', wiek_s: obiekty[p].kiedy ? (Date.now() - obiekty[p].kiedy) / 1000 : null }; return w; };
     let czekamPoPowrocie = false;        /* od powrotu na ekran / zerwania do pierwszej paczki [D-279] */
-    const wspolne = () => { const broker = brokerOgolem(); return ({ obiekty: Object.keys(obiekty), obiekt: wybrany, broker: broker,
+    const wspolne = () => { const broker = brokerOgolem();
+      /* [D-314] podglad dla sond i diagnostyki: kto niesie wybrany obiekt i w jakim stanie sa brokery */
+      M.ostBrokery = POL.map(c => ({ nr: c.nr, host: c.host, stan: c.stan.stan, opis: c.stan.opis, niesie: klDla(wybrany) === c }));
+      return ({ obiekty: Object.keys(obiekty), obiekt: wybrany, broker: broker,
                              brokery: POL.map(c => ({ nr: c.nr, host: c.host, user: c.user, temat: c.temat, stan: c.stan.stan, opis: c.stan.opis, niesie: klDla(wybrany) === c })),
                              wydawcy: wydawcy(), ost: ost, dziennik: M.dziennik, wersja: window.APKA_WERSJA || '',
                              lacze: czekamPoPowrocie || broker.stan !== 'ok',
@@ -740,7 +743,13 @@
     document.addEventListener('resume', () => { zapisz('karta odmrożona'); czekamPoPowrocie = true;
       POL.filter(c => !c.kl.isConnected()).forEach(c => { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('odmrożenie'); }); oddaj(); });
     setInterval(() => { const w = wybrany && obiekty[wybrany];
-      if (brokerOgolem().stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 4000) oglosTeraz(); }, 1000);
+      if (brokerOgolem().stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 4000) oglosTeraz();
+      /*  [D-315] cisza u niosącego (6 s) albo jego zerwanie = wpinamy ciężkie tematy z powrotem WSZĘDZIE.
+          Lepiej przez chwilę odebrać dwa razy, niż nie odebrać wcale. */
+      const cisza = !w || !w.kiedy || Date.now() - w.kiedy > 6000;
+      if (POL.length > 1 && (cisza || POL.some(c => c.lekki && c.stan.stan !== 'ok')))
+        POL.forEach(c => { c.bliz = 0; wepnijCiezkie(c); });
+    }, 1000);
     k.onMessageArrived = m => {
       const cz = m.destinationName.split('/');
       const rodzaj = cz[cz.length - 1];
@@ -809,7 +818,13 @@
           /*  TA SAMA PACZKA DRUGĄ DROGĄ [D-313]: przy dwóch brokerach (i przy powtórce QoS 1) ten sam `seq`
               potrafi przyjść dwa razy. Bez tego wyglądało to jak dziura w numeracji i apka prosiła o pełny
               blok w kółko. Powtórkę po prostu pomijamy - lustro już ją ma. */
-          if (w.seq === d.seq) return;
+          if (w.seq === d.seq) {
+            /*  DOWÓD, ŻE TEN BROKER JEST NADMIAROWY [D-315]: przyniósł paczkę, którą już mamy. Po pięciu takich
+                z rzędu odpinamy od niego ciężkie tematy - ale tylko wtedy, gdy NIE jest tym, który niesie obiekt. */
+            if (_zrodlo !== w.kl && ++_zrodlo.bliz >= 5) odepnijCiezkie(_zrodlo);
+            return;
+          }
+          _zrodlo.bliz = 0;
           if (w.seq != null && d.seq !== w.seq + 1) { w.luka = true; if (pref === wybrany) { zapisz('luka seq ' + w.seq + '→' + d.seq); oglos('pelny'); } }   /* luka → pełny blok od ręki; do niego lustro = zasiew */
           w.seq = d.seq;
         }
@@ -817,7 +832,8 @@
         if (d.mb) for (const k in d.mb) w.mb[+k] = d.mb[k];
         if (d.mn) { if (!w.mn) w.mn = []; for (const k in d.mn) w.mn[+k] = d.mn[k]; }
         if (d.r)  { if (!w.r) w.r = {};  for (const k in d.r)  w.r[+k]  = d.r[k]; }
-        w.kiedy = Date.now(); if (!w.luka) w.zasiew = false; if (pref === wybrany) { ost.zm = w.kiedy; czekamPoPowrocie = false; if (d.mn || d.r || d.mb) odnotujZmiane(); }
+        w.kiedy = Date.now(); w.kl = _zrodlo;   /* [D-314] paczki zmian też mówią, którym brokerem obiekt nadaje TERAZ */
+        if (!w.luka) w.zasiew = false; if (pref === wybrany) { ost.zm = w.kiedy; czekamPoPowrocie = false; if (d.mn || d.r || d.mb) odnotujZmiane(); }
         if (pref === wybrany) oddaj(true);
         return;
       }
@@ -866,6 +882,17 @@
         dziennik, karta SD), qos 0 tam, gdzie i tak przyjdzie następna (blok, stan, status, wynik). */
     const TEMATY = [['blok', 0], ['zm', 1], ['status', 0], ['wynik', 0], ['stan', 0],
                     ['zdarzenia', 1], ['zd', 1], ['pliki', 1], ['plik', 1], ['okres', 1]];
+    /*  CIĘŻKIE I LEKKIE [D-315]: sterownik nadaje każdą paczkę na WSZYSTKIE podłączone brokery (zmierzone:
+        zgłoszenie na jednym włącza strumień na obu), więc przy dwóch brokerach telefon odbierał wszystko dwa razy.
+        `zm` i `blok` to praktycznie cały ruch - te zostają tylko na brokerze, który NIESIE obiekt. Lekkie
+        (`status`, `wynik`, `stan`, dziennik, karta) zostają na obu: są rzadkie, a `status` z obu jest nam potrzebny,
+        żeby odróżnić „sterownik padł" od „ten broker już go nie obsługuje" (testament - D-314). */
+    const CIEZKIE = ['zm', 'blok'];
+    const odepnijCiezkie = c => { if (c.lekki) return; c.lekki = true;
+      try { CIEZKIE.forEach(tm => c.kl.unsubscribe(c.temat + '/' + tm)); zapisz(etyk(c) + 'odpięte ciężkie tematy - te same paczki idą drugą drogą'); } catch (e) {} };
+    const wepnijCiezkie = c => { if (!c.lekki || !c.kl.isConnected()) return; c.lekki = false;
+      try { TEMATY.filter(tm => CIEZKIE.indexOf(tm[0]) >= 0).forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
+            zapisz(etyk(c) + 'ciężkie tematy z powrotem'); } catch (e) {} };
     const zrobDriver = c => {
       c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
       const ponowPozniej = powod => {
@@ -913,7 +940,8 @@
         oddaj();
       };
       c.opcje = { useSSL: true, userName: c.user, password: c.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: false,
-        onSuccess: () => { TEMATY.forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
+        onSuccess: () => { c.lekki = false; c.bliz = 0;
+                           TEMATY.forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
                            if (wybrany) oglos(tempo); },
         onFailure: r => {
           const rc = rcZ(r);
@@ -976,7 +1004,13 @@
         const pref = cz.slice(0, -1).join('/');
         if (!obiekty[pref]) obiekty[pref] = { txt: '', kiedy: 0 };
         if (!obiekty[pref].kl) obiekty[pref].kl = _zrodlo;   /* [D-313] obiekt, który tylko ogłosił status - odpowiadamy tym samym brokerem */
-        obiekty[pref].status = (m.payloadString || '').trim() || '?';   // online | offline (testament)
+        /*  STATUS JEST PER BROKER [D-314, zmierzone przy przełączaniu]: gdy sterownik przestaje korzystać z jednego
+            serwera, TEN broker ogłasza „offline" z testamentu - a sterownik w najlepsze nadaje drugim. Jeden wspólny
+            `status` dawał wtedy czerwoną kropkę przy żywym obiekcie. Liczymy: online, jeśli CHOĆ JEDEN broker tak mówi. */
+        const w0 = obiekty[pref]; const st = (m.payloadString || '').trim() || '?';
+        (w0.statusy || (w0.statusy = {}))[_zrodlo.nr] = st;
+        const lista = Object.values(w0.statusy);
+        w0.status = lista.indexOf('online') >= 0 ? 'online' : (lista.indexOf('offline') >= 0 ? 'offline' : '?');
         if (!wybrany) { wybrany = pref; oglos(tempo); }
         oddaj(); return;
       }
