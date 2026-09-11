@@ -472,14 +472,14 @@
         temat obiektu = 'basen/' + slug z PIERWSZYM myślnikiem zamienionym na '/' → 'basen/gliczarow/wanna' - taki sam
         prefiks wpisuje się w sterowniku (serwis → sieć). Konto bez myślnika (serwisowe: „sterownik") widzi wszystko.
         To filtr po stronie apki; twarde odcięcie tematów per konto da dopiero ACL na własnym Mosquitto. */
-    if (!o.temat) { const u = String(o.user || ''); const i = u.indexOf('-');
-      /*  KTO WIDZI CO [D-312]: `serwis` przychodzi z logowania (ptaszek „konto serwisowe"). Gdy go nie ma - zapis
-          sprzed 11.09 - zostaje stara zasada (login bez myślnika = serwisowy), żeby zapamiętane logowanie nie padło.
-          ⚠ Sama zasada była dziurawa: klient o jednoczłonowej nazwie („Sadzawka") dostawał widok na wszystkie obiekty. */
-      const serw = (o.serwis === undefined || o.serwis === null) ? (i <= 0) : !!o.serwis;
-      if (serw) o.temat = 'basen/+/+';
-      else if (i > 0) { o.temat = 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1); if (!o.obiekt) o.obiekt = o.temat; }
-      else o.temat = 'basen/' + u + '/+'; }   /* konto jednoczłonowe bez ptaszka: własna gałąź, nie cały broker */
+    /*  KTO WIDZI CO [D-312]: `serwis` przychodzi z logowania (ptaszek „konto serwisowe"). Gdy go nie ma - zapis
+        sprzed 11.09 - zostaje stara zasada (login bez myślnika = serwisowy), żeby zapamiętane logowanie nie padło.
+        ⚠ Sama zasada była dziurawa: klient o jednoczłonowej nazwie („Sadzawka") dostawał widok na wszystkie obiekty. */
+    const zakresZ = (uzyt, serwis) => { const u = String(uzyt || ''); const i = u.indexOf('-');
+      const serw = (serwis === undefined || serwis === null) ? (i <= 0) : !!serwis;
+      return serw ? 'basen/+/+' : (i > 0 ? 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1) : 'basen/' + u + '/+'); };
+    if (!o.temat) { o.temat = zakresZ(o.user, o.serwis);
+      if (o.temat.indexOf('+') < 0 && !o.obiekt) o.obiekt = o.temat; }
     M.zakres = o.temat;   /* [D-312] widoczne dla sond i diagnostyki: co to konto ogląda */
     /*  KOMENDY PRZEZ BROKER [D-267, Tomasz: „apka nie musi mieć uprawnień, bo
         serwis za PIN-em, a reszta dla klienta"]. fetch('/cmd?co=…') z makiety
@@ -539,12 +539,12 @@
       if (s.startsWith('/pliki')) {
         const q = new URLSearchParams(s.slice(s.indexOf('?') + 1)); const kat = q.get('kat') || 'zdarzenia';
         const odp = o => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
-        if (!wybrany || !k || !k.isConnected()) return Promise.resolve(odp({ karta: null, pliki: [] }));
+        if (!wybrany || !klGot(wybrany)) return Promise.resolve(odp({ karta: null, pliki: [] }));
         return new Promise(res => { czekaPliki = { kat, res, t: setTimeout(() => { if (czekaPliki && czekaPliki.res === res) { czekaPliki = null; res(odp({ karta: null, pliki: [] })); } }, 8000) }; oglos('pliki:' + kat); }).then(r => r);
       }
       if (s.startsWith('/okres')) {               /* zdarzenia z okresu [D-298]: kawałki aż dalej=0 */
         const q = new URLSearchParams(s.slice(s.indexOf('?') + 1)); const kat = q.get('kat') || 'zdarzenia', od = +q.get('od') || 0, dok = +q.get('do') || 0;
-        if (!wybrany || !k || !k.isConnected()) return Promise.resolve(new Response(JSON.stringify({ blad: 'brak połączenia' }), { status: 200 }));
+        if (!wybrany || !klGot(wybrany)) return Promise.resolve(new Response(JSON.stringify({ blad: 'brak połączenia' }), { status: 200 }));
         return new Promise(res => {
           czekaOkres = { kat, od, dok, poz: 0, linie: [], res, t: null };
           const nastepny = () => { oglos('okres:' + kat + ':' + od + ':' + dok + ':' + czekaOkres.poz);   /* poz = kursor z odpowiedzi [D-300] */
@@ -554,7 +554,7 @@
       }
       if (s.startsWith('/plik?')) {
         const q = new URLSearchParams(s.slice(s.indexOf('?') + 1)); const kat = q.get('kat') || 'zdarzenia', nazwa = q.get('nazwa') || '', json = q.get('json') === '1';
-        if (!wybrany || !k || !k.isConnected() || !nazwa) return Promise.resolve(new Response(JSON.stringify({ blad: 'brak połączenia' }), { status: 200 }));
+        if (!wybrany || !klGot(wybrany) || !nazwa) return Promise.resolve(new Response(JSON.stringify({ blad: 'brak połączenia' }), { status: 200 }));
         return new Promise(res => {
           czekaPlik = { kat, nazwa, od: 0, tekst: '', res, json, t: null };
           const nastepny = () => { oglos('plik:' + kat + '/' + nazwa + ':' + czekaPlik.od);
@@ -568,7 +568,7 @@
       const tr = komendaNaZapisy(co, wart, M.obieg);
       const odp = o => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
       if (tr.blad) return Promise.resolve(odp({ ok: false, opis: tr.blad }));
-      if (!wybrany || !k || !k.isConnected()) return Promise.resolve(odp({ ok: false, opis: 'brak połączenia z brokerem' }));
+      if (!wybrany || !klGot(wybrany)) return Promise.resolve(odp({ ok: false, opis: 'brak połączenia z brokerem' }));
       const wyslij = pin => new Promise(res => {
         /* ZEGAR STEROWNIKA, nie telefonu: DS3231 chodzi w czasie lokalnym, telefon
            liczy UTC - 2 h różnicy odbijało każdą komendę kodem 2 („sprawdź zegar").
@@ -578,9 +578,11 @@
         const id = nowyId(), t0 = Date.now(), coTxt = co + (wart != null ? '=' + wart : '');
         const tresc = 't=' + tSter + ';id=' + id + (pin ? ';pin=' + pin : '') + ';w=' + tr.zapisy.map(z => z[0] + ':' + z[1]).join(',');
         const msg = new Paho.Message(tresc); msg.destinationName = wybrany + '/komenda'; msg.qos = 1;
+        const kk = klGot(wybrany);   /* [D-313] brokerem, którym ten obiekt nadaje; mógł paść między sprawdzeniem a wysyłką */
+        if (!kk) { res({ ok: false, opis: 'brak połączenia z brokerem' }); return; }
         oczekuja.set(id, { res, t0, co: coTxt }); czekaWynik = res;
         czekamZmiany = { t0, co: coTxt };
-        k.send(msg);
+        kk.send(msg);
         setTimeout(() => { if (oczekuja.has(id)) { oczekuja.delete(id); if (czekaWynik === res) czekaWynik = null;
                                                    zapisz('bez wyniku 5 s: ' + coTxt); res({ ok: false, opis: 'sterownik nie potwierdził komendy w 5 s' }); } }, 5000);
       });
@@ -600,7 +602,7 @@
     let prosZdOst = 0;
     /* prośba o pamięć zdarzeń (RAM sterownika); przed połączeniem NIE liczy się jako próba - inaczej wstępne wczytanie
        ze startu apki (D-308) przepadało i dziennik czekał 15 s na kolejną */
-    M.prosZdarzenia = () => { if (!wybrany || !k || !k.isConnected()) return; const t = Date.now(); if (t - prosZdOst < 15000) return; prosZdOst = t; oglos('zdarzenia'); };
+    M.prosZdarzenia = () => { if (!wybrany || !klGot(wybrany)) return; const t = Date.now(); if (t - prosZdOst < 15000) return; prosZdOst = t; oglos('zdarzenia'); };
     /*  STAN BROKERA I WYDAWCÓW NA PASKU [Tomasz 2026-09-09: „apka powinna mieć na górze
         status połączenia z brokerem i status wydawców"]. Trzy rzeczy, trzy źródła:
         - broker: zdarzenia własnego klienta (łączę / połączony / odmowa / zerwane);
@@ -610,7 +612,6 @@
         - świeżość: wiek ostatniego `blok` danego obiektu.
         Wszystko idzie w KAŻDYM podaj(): broker{stan,opis}, wydawcy{prefiks→{status,wiek_s}},
         żeby pasek nie musiał składać stanu z kilku różnych wywołań. */
-    let broker = { stan: 'laczy', opis: 'łączę z brokerem…' };
     /*  DZIENNIK ZDARZEŃ KLIENTA [D-278, Tomasz 2026-09-09: „musimy śledzić, co się dzieje, logami"]:
         ostatnie 60 zdarzeń (połączenia, zerwania, żądania, pełne bloki, luki seq) - pasek pokazuje
         je po dotknięciu „PRZEZ CHMURĘ". Do tego znaczniki czasu ostatnich zdarzeń, bo „pakiet N s
@@ -624,9 +625,11 @@
     const wydawcy = () => { const w = {}; for (const p in obiekty)
       w[p] = { status: obiekty[p].status || '?', wiek_s: obiekty[p].kiedy ? (Date.now() - obiekty[p].kiedy) / 1000 : null }; return w; };
     let czekamPoPowrocie = false;        /* od powrotu na ekran / zerwania do pierwszej paczki [D-279] */
-    const wspolne = () => ({ obiekty: Object.keys(obiekty), obiekt: wybrany, broker: broker, wydawcy: wydawcy(), ost: ost, dziennik: M.dziennik, wersja: window.APKA_WERSJA || '',
+    const wspolne = () => { const broker = brokerOgolem(); return ({ obiekty: Object.keys(obiekty), obiekt: wybrany, broker: broker,
+                             brokery: POL.map(c => ({ nr: c.nr, host: c.host, user: c.user, temat: c.temat, stan: c.stan.stan, opis: c.stan.opis, niesie: klDla(wybrany) === c })),
+                             wydawcy: wydawcy(), ost: ost, dziennik: M.dziennik, wersja: window.APKA_WERSJA || '',
                              lacze: czekamPoPowrocie || broker.stan !== 'ok',
-                             blad: (broker.stan === 'ok' || broker.stan === 'laczy') ? null : broker.opis });
+                             blad: (broker.stan === 'ok' || broker.stan === 'laczy') ? null : broker.opis }); };
     /* ostatnio wybrany obiekt pamietany w telefonie - przy dwu obiektach apka otwiera ten, na ktory patrzono */
     const pamiec = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
     let wybrany = o.obiekt || pamiec('mqtt_obiekt') || null;
@@ -643,7 +646,33 @@
         window.WebSocket = WSo;
       }
     } catch (e) {}
-    const k = new Klient(o.host, o.port || 8884, '/mqtt', cid);
+    /*  DWA BROKERY NARAZ [D-313, Tomasz 2026-09-11: „no i co z obsługą 2 brokerów na raz?"].
+        Sterownik ma serwer GŁÓWNY i AWARYJNY (rejestr 3225 mówi, którym nadaje) i komendy przyjmuje z obu.
+        Apka trzyma teraz po jednym kliencie na broker: JEDNO lustro obiektów, osobne łączenie i osobne
+        ponawianie na każdy, a `zadanie` i komendy idą do tego brokera, którym dany obiekt PRZYSZEDŁ
+        (`obiekty[pref].kl`). Dzięki temu przełączenie sterownika na awaryjny jest dla patrzącego niewidoczne,
+        a konto serwisowe widzi w jednej apce obiekty z HiveMQ i z własnego brokera naraz. */
+    const POL = [{ nr: 1, host: o.host, port: o.port || 8884, user: o.user, pass: o.pass, temat: o.temat }];
+    if (o.host2 && o.user2) POL.push({ nr: 2, host: o.host2, port: o.port2 || 8884, user: o.user2, pass: o.pass2,
+                                       temat: o.temat2 || zakresZ(o.user2, o.serwis2 !== undefined ? o.serwis2 : o.serwis) });
+    POL.forEach((c, i) => { c.kl = new Klient(c.host, c.port, '/mqtt', cid + (i ? '-' + (i + 1) : ''));
+                            c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; });
+    const k = POL[0].kl;                    /* pierwszy broker = główny; skrót dla czytelności niżej */
+    /*  KTÓRY KLIENT OBSŁUGUJE DANY OBIEKT: ten, którym przyszedł jego blok. Zanim cokolwiek przyjdzie -
+        pierwszy połączony. `klGot` oddaje klienta TYLKO gdy jest połączony (inaczej komenda nie ma czym pojechać). */
+    const klDla = pref => { const w = pref && obiekty[pref]; return (w && w.kl) || POL.find(c => c.kl.isConnected()) || POL[0]; };
+    const klGot = pref => { const c = klDla(pref); return (c && c.kl.isConnected()) ? c.kl : null; };
+    /*  STAN DLA PASKA: zielony, gdy broker niosący wybrany obiekt działa; przy dwóch brokerach opis wymienia oba,
+        żeby w ustawieniach było widać, który padł. */
+    const brokerOgolem = () => {
+      const c = klDla(wybrany);
+      const ok = POL.filter(x => x.stan.stan === 'ok');
+      if (POL.length === 1) return POL[0].stan;
+      if (c && c.stan.stan === 'ok') return { stan: 'ok', opis: POL.map(x => 'serwer ' + x.nr + ': ' + x.stan.opis).join(' · ') };
+      if (ok.length) return { stan: 'ok', opis: POL.map(x => 'serwer ' + x.nr + ': ' + x.stan.opis).join(' · ') };
+      const zly = POL.find(x => x.stan.stan !== 'laczy') || POL[0];
+      return { stan: zly.stan.stan, opis: POL.map(x => 'serwer ' + x.nr + ': ' + x.stan.opis).join(' · ') };
+    };
     /*  `nowe` [D-280]: prawda tylko, gdy oddaj() woła świeża paczka (zm/blok) albo zmiana obiektu.
         Cykliczne oddaj() co 1 s liczy wiek i stan brokera, ale ekran NIE dostaje wtedy świata -
         stare lustro potwierdzało żądanie kafla (bylo=null) i światło mignęło „zgaszone". */
@@ -658,14 +687,14 @@
       const swiat = mb ? M.swiatZ(mb, mn, M.ost.rej, ob) : null;
       if (swiat && zdarzenia[wybrany]) swiat.zdarzenia = zdarzenia[wybrany];   /* dziennik zdarzeń do ekranu serwisu [D-295] */
       /* zasiew = liczby z retained bloku (0-60 s stare): ekran je pokazuje pod zasłoną „pobieram stan…", nie pod ciemną planszą [D-281] */
-      podaj(Object.assign({ polaczony: !!swiat && wiek < 3 * (o.okres_s || 30) && broker.stan === 'ok', swiat, wiek_s: wiek, nowe: !!nowe, zasiew: !!(w && w.zasiew) }, wspolne()));
+      podaj(Object.assign({ polaczony: !!swiat && wiek < 3 * (o.okres_s || 30) && brokerOgolem().stan === 'ok', swiat, wiek_s: wiek, nowe: !!nowe, zasiew: !!(w && w.zasiew) }, wspolne()));
     };
     /*  OBECNOŚĆ: sterownik nadaje tylko, gdy ktoś patrzy — mówimy mu co 20 s,
         w jakim tempie (ms); po zamknięciu karty milczy sam po 60 s. Przy
         zamykaniu strony wysyłamy 0 = „przestaję patrzeć", żeby nie czekał. */
     const tempo = o.tempo_ms || 1000;
-    const oglos = v => { if (!wybrany || !k || !k.isConnected()) return;
-      const m = new Paho.Message(String(v)); m.destinationName = wybrany + '/zadanie'; k.send(m); ost.zadanie = Date.now(); if (v === 'pelny') zapisz('żądanie pełnego bloku'); };
+    const oglos = v => { const kk = klGot(wybrany); if (!wybrany || !kk) return;
+      const m = new Paho.Message(String(v)); m.destinationName = wybrany + '/zadanie'; kk.send(m); ost.zadanie = Date.now(); if (v === 'pelny') zapisz('żądanie pełnego bloku'); };
     setInterval(() => oglos(tempo), 20000);
     /* `zadanie`=0 przy pagehide ZDJĘTE [D-287]: jeden schodzący do tła podglądacz gasił strumień pozostałym; sterownik gaśnie sam 60 s po ostatnim odnowieniu */
     /*  WZNOWIENIE PODGLĄDU BEZ CZEKANIA [2026-09-09, Tomasz: „jak nie dostanie pakietu na czas,
@@ -687,11 +716,9 @@
       zapisz(widoczna ? 'powrót na ekran' : 'w tle');
       if (!widoczna) return;
       czekamPoPowrocie = true; oddaj();
-      if (k && !k.isConnected()) {
-        broker = { stan: 'laczy', opis: 'łączę ponownie…' };
-        odstepNr = 0; polaczTeraz('powrót na ekran');
-        oddaj();
-      } else oglosTeraz();
+      const doZrobienia = POL.filter(c => !c.kl.isConnected());
+      if (doZrobienia.length) { doZrobienia.forEach(c => { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('powrót na ekran'); }); oddaj(); }
+      if (POL.some(c => c.kl.isConnected())) oglosTeraz();
     });
     window.addEventListener('focus', oglosTeraz);
     /*  ⚠ W DZIENNIKU Z TELEFONU NIE BYŁO WPISU „w tle" [D-310], choć karta stała 7 min w tle: Chrome na Androidzie
@@ -701,9 +728,9 @@
     window.addEventListener('pagehide', () => zapisz('karta schowana (pagehide)'));
     document.addEventListener('freeze', () => zapisz('karta zamrożona przez przeglądarkę'));
     document.addEventListener('resume', () => { zapisz('karta odmrożona'); czekamPoPowrocie = true;
-      if (k && !k.isConnected()) { broker = { stan: 'laczy', opis: 'łączę ponownie…' }; odstepNr = 0; polaczTeraz('odmrożenie'); } oddaj(); });
+      POL.filter(c => !c.kl.isConnected()).forEach(c => { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('odmrożenie'); }); oddaj(); });
     setInterval(() => { const w = wybrany && obiekty[wybrany];
-      if (broker.stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 4000) oglosTeraz(); }, 1000);
+      if (brokerOgolem().stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 4000) oglosTeraz(); }, 1000);
     k.onMessageArrived = m => {
       const cz = m.destinationName.split('/');
       const rodzaj = cz[cz.length - 1];
@@ -769,6 +796,10 @@
         let d = null; try { d = JSON.parse(m.payloadString); } catch (e) { return; }
         if (!d) return;
         if (typeof d.seq === 'number') {
+          /*  TA SAMA PACZKA DRUGĄ DROGĄ [D-313]: przy dwóch brokerach (i przy powtórce QoS 1) ten sam `seq`
+              potrafi przyjść dwa razy. Bez tego wyglądało to jak dziura w numeracji i apka prosiła o pełny
+              blok w kółko. Powtórkę po prostu pomijamy - lustro już ją ma. */
+          if (w.seq === d.seq) return;
           if (w.seq != null && d.seq !== w.seq + 1) { w.luka = true; if (pref === wybrany) { zapisz('luka seq ' + w.seq + '→' + d.seq); oglos('pelny'); } }   /* luka → pełny blok od ręki; do niego lustro = zasiew */
           w.seq = d.seq;
         }
@@ -782,7 +813,7 @@
       }
       if (rodzaj !== 'blok') return;
       const pref = cz.slice(0, -1).join('/');
-      obiekty[pref] = Object.assign(obiekty[pref] || {}, { kiedy: Date.now() });   // status z `status` zostaje
+      obiekty[pref] = Object.assign(obiekty[pref] || {}, { kiedy: Date.now(), kl: _zrodlo });   // status z `status` zostaje; `kl` = broker, którym przyszedł [D-313]
       zastosujPelny(pref, obiekty[pref], m.payloadString);
       /*  RETAINED = ZASIEW, NIE ŚWIEŻY STAN [D-280]: blok z flagą retained ma od 0 do 60 s. Zasiewa
           lustro (rejestry, seq), ale nie zdejmuje planszy - świeży pełny blok przychodzi po `zadanie`
@@ -810,85 +841,81 @@
       if (/AMQJSC0001E/.test(m)) return 'brak odpowiedzi brokera (limit czasu)';
       if (/AMQJS0006E/.test(m)) return 'broker odrzucił połączenie' + (rcZ(r) !== null ? ' (kod ' + rcZ(r) + ')' : '');
       return m.replace(/^AMQJS[C]?\d+[EI]\s*/, '') || 'powód nieznany'; };
-    let zerwaneOd = 0, byloWTle = false, byloZerwane = false;
     /*  PONAWIANIE JEST NASZE, NIE PAHO [D-310] - `reconnect:false` w opcjach niżej.
         Dlaczego: z `reconnect:true` biblioteka po zamrożeniu karty zostaje ze stanem „łączę ponownie"
         i martwym gniazdem, z którego nie ma wyjścia jej własnym API (connect rzuca „already connected",
         zamknięcie gniazda jest wtedy ignorowane, a disconnect wywala się na pustym zegarze) - czekało się
         na jej limit czasu i odstęp, czyli kilkanaście sekund po każdym powrocie do apki.
         Teraz: każdy powód (zerwane, nieudana próba, powrót na ekran, odmrożenie) prowadzi do jednej
-        drogi - `polaczTeraz`. Odstępy 1, 2, 5, 10, 20, 30, 60 s; powrót na ekran zeruje je i próbuje od razu. */
+        drogi - `polaczTeraz`. Odstępy 1, 2, 5, 10, 20, 30, 60 s; powrót na ekran zeruje je i próbuje od razu.
+        [D-313] KAŻDY BROKER MA SWÓJ komplet: stan, odstęp, zegar i gniazdo siedzą w jego wpisie `c` z POL;
+        wspólne są tylko lustro obiektów, dziennik i ekran. */
     const ODSTEPY = [1, 2, 5, 10, 20, 30, 60];
-    let odstepNr = 0, ponowZegar = null;
-    const ponowPozniej = powod => {
-      const sek = ODSTEPY[Math.min(odstepNr, ODSTEPY.length - 1)]; odstepNr++;
-      if (ponowZegar) clearTimeout(ponowZegar);
-      ponowZegar = setTimeout(() => { ponowZegar = null; polaczTeraz(powod); }, sek * 1000);
-      return sek;
+    const etyk = c => (POL.length > 1 ? 'serwer ' + c.nr + ': ' : '');
+    /*  Komplet tematów obiektu; qos 1 tam, gdzie zgubiona wiadomość to zgubiona odpowiedź (paczki zmian,
+        dziennik, karta SD), qos 0 tam, gdzie i tak przyjdzie następna (blok, stan, status, wynik). */
+    const TEMATY = [['blok', 0], ['zm', 1], ['status', 0], ['wynik', 0], ['stan', 0],
+                    ['zdarzenia', 1], ['zd', 1], ['pliki', 1], ['plik', 1], ['okres', 1]];
+    const zrobDriver = c => {
+      c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
+      const ponowPozniej = powod => {
+        const sek = ODSTEPY[Math.min(c.odstepNr, ODSTEPY.length - 1)]; c.odstepNr++;
+        if (c.ponowZegar) clearTimeout(c.ponowZegar);
+        c.ponowZegar = setTimeout(() => { c.ponowZegar = null; c.polaczTeraz(powod); }, sek * 1000);
+        return sek;
+      };
+      c.polaczTeraz = powod => {
+        if (!c.kl || c.kl.isConnected()) return;
+        /* ⚠ nie dobijamy brokera: seria zdarzeń (powrót + odmrożenie + zerwanie w tej samej chwili) ma dać JEDNĄ próbę */
+        const teraz = Date.now(); if (teraz - c.ostProba < 1500) return; c.ostProba = teraz;
+        if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
+        const sprobuj = () => { c.kl.connect(c.opcje); c.gniazdo = M._gniazdo; c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; oddaj(); };
+        try { sprobuj(); return; }
+        catch (e) {
+          /*  gniazdo poprzedniej próby wisi (zamrożone razem z kartą): zamykamy je i wołamy obsługę zamknięcia,
+              którą Paho sam do niego podpiął - biblioteka od razu wie, że gniazda nie ma. Bez tego czekałaby
+              pełny własny limit czasu. Przy `reconnect:false` ta droga zawsze działa. */
+          try { const g = c.gniazdo;
+            if (g) { try { g.close(); } catch (e2) {} if (typeof g.onclose === 'function') g.onclose({ code: 1006, wasClean: false }); }
+          } catch (e3) {}
+          try { sprobuj(); zapisz(etyk(c) + 'gniazdo w locie zamknięte - łączę (' + powod + ')'); return; }
+          catch (e4) { const s = ponowPozniej(powod); zapisz(etyk(c) + 'próba za ' + s + ' s (' + pahoTekst(e4) + ')'); }
+        }
+      };
+      c.kl.onConnectionLost = r => { const co = pahoTekst(r); c.zerwaneOd = Date.now(); c.byloZerwane = true;
+        c.byloWTle = (document.visibilityState === 'hidden');
+        c.stan = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' };
+        if (klDla(wybrany) === c) czekamPoPowrocie = true;
+        zapisz(etyk(c) + 'zerwane: ' + co); oddaj();
+        c.odstepNr = 0; c.polaczTeraz('zerwane');   /* od razu; gdy sieci nie ma, próba padnie i pójdą odstępy */
+      };
+      /*  PO KAŻDYM POŁĄCZENIU: `onSuccess` (subskrypcje - cleanSession je kasuje przy zerwaniu) leci przy KAŻDYM
+          CONNACK, a `onConnected` podpisuje pasek. Czy to POWRÓT po zerwaniu, wiemy z własnej flagi `byloZerwane`
+          - Paho przy `reconnect:false` zawsze podaje „pierwsze połączenie" [D-310]. */
+      c.kl.onConnected = () => {
+        const ponownie = c.byloZerwane;
+        const przerwa = (ponownie && c.zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - c.zerwaneOd) / 1000) + ' s' + (c.byloWTle ? ', telefon był w tle' : '') + ')' : '';
+        c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0;
+        if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
+        c.stan = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
+        zapisz(etyk(c) + (ponownie ? 'połączony ponownie' + przerwa : 'połączony'));
+        if (ponownie && wybrany && klDla(wybrany) === c) oglos('pelny');   /* w czasie przerwy paczki zmian przepadły, retained blok bywa 60 s stary [D-278] */
+        oddaj();
+      };
+      c.opcje = { useSSL: true, userName: c.user, password: c.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: false,
+        onSuccess: () => { TEMATY.forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
+                           if (wybrany) oglos(tempo); },
+        onFailure: r => {
+          const rc = rcZ(r);
+          /* ZŁE DANE LOGOWANIA NIE PONAWIAJĄ SIĘ - to człowiek musi poprawić (inaczej broker blokuje konto za dobijanie) */
+          if (rc === 4 || rc === 5) { c.stan = { stan: 'blad', opis: 'broker odmówił - złe dane logowania (użytkownik/hasło)' }; zapisz(etyk(c) + 'odmowa: złe dane logowania'); oddaj(); return; }
+          const powod = rc === 3 ? 'broker niedostępny' : rc === 1 || rc === 2 ? 'broker odrzucił klienta (kod ' + rc + ')'
+                      : 'broker nie odpowiada (brak zasięgu?)';
+          const sek = ponowPozniej('nieudana próba');
+          c.stan = { stan: 'blad', opis: powod + ' - ponowna próba za ' + sek + ' s' }; zapisz(etyk(c) + 'odmowa: ' + powod + ' - próba za ' + sek + ' s'); oddaj();
+        } };
     };
-    let ostProba = 0;
-    const polaczTeraz = powod => {
-      if (!k || k.isConnected()) return;
-      /* ⚠ nie dobijamy brokera: seria zdarzeń (powrót + odmrożenie + zerwanie w tej samej chwili) ma dać JEDNĄ próbę */
-      const teraz = Date.now(); if (teraz - ostProba < 1500) return; ostProba = teraz;
-      if (ponowZegar) { clearTimeout(ponowZegar); ponowZegar = null; }
-      try { k.connect(opcje); broker = { stan: 'laczy', opis: 'łączę z brokerem…' }; oddaj(); return; }
-      catch (e) {
-        /*  gniazdo poprzedniej próby wisi (zamrożone razem z kartą): zamykamy je i wołamy obsługę zamknięcia,
-            którą Paho sam do niego podpiął - biblioteka od razu wie, że gniazda nie ma. Bez tego czekałaby
-            pełny własny limit czasu. Przy `reconnect:false` ta droga zawsze działa. */
-        try { const g = M._gniazdo;
-          if (g) { try { g.close(); } catch (e2) {} if (typeof g.onclose === 'function') g.onclose({ code: 1006, wasClean: false }); }
-        } catch (e3) {}
-        try { k.connect(opcje); broker = { stan: 'laczy', opis: 'łączę z brokerem…' }; zapisz('gniazdo w locie zamknięte - łączę (' + powod + ')'); oddaj(); return; }
-        catch (e4) { const s = ponowPozniej(powod); zapisz('próba za ' + s + ' s (' + pahoTekst(e4) + ')'); }
-      }
-    };
-    k.onConnectionLost = r => { const co = pahoTekst(r); zerwaneOd = Date.now(); byloZerwane = true;
-      byloWTle = (document.visibilityState === 'hidden');
-      broker = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' }; czekamPoPowrocie = true; zapisz('zerwane: ' + co); oddaj();
-      odstepNr = 0; polaczTeraz('zerwane');   /* od razu; gdy sieci nie ma, próba padnie i pójdą odstępy */
-    };
-    /*  PO KAŻDYM POŁĄCZENIU: `onSuccess` (subskrypcje - cleanSession je kasuje przy zerwaniu) leci przy KAŻDYM
-        CONNACK, a `onConnected` podpisuje pasek. Czy to POWRÓT po zerwaniu, wiemy z własnej flagi `byloZerwane`
-        - Paho przy `reconnect:false` zawsze podaje „pierwsze połączenie" [D-310]. */
-    k.onConnected = () => {
-      const ponownie = byloZerwane;
-      const przerwa = (ponownie && zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - zerwaneOd) / 1000) + ' s' + (byloWTle ? ', telefon był w tle' : '') + ')' : '';
-      zerwaneOd = 0; byloWTle = false; byloZerwane = false; odstepNr = 0;
-      if (ponowZegar) { clearTimeout(ponowZegar); ponowZegar = null; }
-      broker = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
-      zapisz(ponownie ? 'połączony ponownie' + przerwa : 'połączony');
-      if (ponownie && wybrany) oglos('pelny');   /* w czasie przerwy paczki zmian przepadły, retained blok bywa 60 s stary [D-278] */
-      oddaj();
-    };
-    /*  POWOD ODMOWY Z CONNACK [2026-09-09]: Paho w onFailure daje errorCode = numer WŁASNEGO błędu
-        (6 = „Bad Connack return code"), a kod brokera (4 = złe hasło, 5 = brak uprawnień, 3 = broker
-        niedostępny) siedzi tylko w treści komunikatu - stąd wyrażenie. Dawne `errorCode === 5`
-        nigdy nie było prawdą i złe hasło wyglądało jak „broker nie odpowiada".
-        PONAWIANIE robi `polaczTeraz`/`ponowPozniej` wyżej (D-310) - także po pierwszej nieudanej próbie
-        (telefon bez zasięgu przy otwarciu apki), której Paho sam nigdy nie ponawia. */
-    const opcje = { useSSL: true, userName: o.user, password: o.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: false,
-      onSuccess: () => { k.subscribe((o.temat || 'basen/+/+') + '/blok', { qos: 0 });
-                         k.subscribe((o.temat || 'basen/+/+') + '/zm', { qos: 1 });      // paczki zmian [D-277]
-                         k.subscribe((o.temat || 'basen/+/+') + '/status', { qos: 0 });  // lista obiektów (retained) - TU, nie po 500 ms
-                         k.subscribe((o.temat || 'basen/+/+') + '/wynik', { qos: 0 });
-                         k.subscribe((o.temat || 'basen/+/+') + '/stan', { qos: 0 });   // zegar sterownika do znacznika komendy
-                         k.subscribe((o.temat || 'basen/+/+') + '/zdarzenia', { qos: 1 }); // dziennik zdarzeń na prośbę [D-295]
-                         k.subscribe((o.temat || 'basen/+/+') + '/zd', { qos: 1 });        // nowe wpisy dziennika na żywo
-                         k.subscribe((o.temat || 'basen/+/+') + '/pliki', { qos: 1 });     // karta SD: lista plików [D-297]
-                         k.subscribe((o.temat || 'basen/+/+') + '/plik', { qos: 1 });      // karta SD: kawałki pliku
-                         k.subscribe((o.temat || 'basen/+/+') + '/okres', { qos: 1 });     // zdarzenia z okresu [D-298]
-                         if (wybrany) oglos(tempo); },
-      onFailure: r => {
-        const rc = rcZ(r);
-        /* ZŁE DANE LOGOWANIA NIE PONAWIAJĄ SIĘ - to człowiek musi poprawić (inaczej broker blokuje konto za dobijanie) */
-        if (rc === 4 || rc === 5) { broker = { stan: 'blad', opis: 'broker odmówił - złe dane logowania (użytkownik/hasło)' }; zapisz('odmowa: złe dane logowania'); oddaj(); return; }
-        const powod = rc === 3 ? 'broker niedostępny' : rc === 1 || rc === 2 ? 'broker odrzucił klienta (kod ' + rc + ')'
-                    : 'broker nie odpowiada (brak zasięgu?)';
-        const sek = ponowPozniej('nieudana próba');
-        broker = { stan: 'blad', opis: powod + ' - ponowna próba za ' + sek + ' s' }; zapisz('odmowa: ' + powod + ' - próba za ' + sek + ' s'); oddaj();
-      } };
+    POL.forEach(zrobDriver);
     /*  ZIMNY START Z PAMIĘCI TELEFONU [D-289, C4]: ostatni pełny blok wybranego obiektu leży w localStorage.
         Otwarcie apki = liczby OD RAZU pod zasłoną „łączę…/pobieram stan…" (zasiew), nie ciemna plansza;
         świeży blok przychodzi po `zadanie`. Warunki brzegowe: blok z pamięci ma `seq` sprzed godzin →
@@ -897,7 +924,7 @@
     if (wybrany) { const c = pamiec('blok_' + wybrany);
       if (c && c.indexOf('MB;') === 0 || (c && c.indexOf('\nMB;') >= 0)) { obiekty[wybrany] = { kiedy: Date.now() - 100000, zasiew: true, luka: true, status: '?' };
         zastosujPelny(wybrany, obiekty[wybrany], c); zapisz('blok z pamięci telefonu (zasiew)'); } }
-    k.connect(opcje);
+    POL.forEach(c => { zapisz(etyk(c) + 'zakres: ' + c.temat); c.polaczTeraz('start'); });
     oddaj(!!(wybrany && obiekty[wybrany]));   /* od razu: liczby z pamięci pod zasłoną albo plansza „łączę z brokerem…" */
     /* wiek pakietu ma płynąć także między pakietami - kafel ma zblednąć, gdy obiekt zamilkł */
     setInterval(() => oddaj(false), 1000);
@@ -908,7 +935,7 @@
         Zwraca 'ok' | 'zle' | <komunikat>. Ekran serwisu w apce woła to przy wejściu, więc PIN
         jest JEDEN — ten ze sterownika. */
     M.sprawdzPin = pin => new Promise(res => {
-      if (!wybrany || !k || !k.isConnected()) { res('brak połączenia z brokerem'); return; }
+      if (!wybrany || !klGot(wybrany)) { res('brak połączenia z brokerem'); return; }
       const zg = zegar[wybrany];
       const tSter = zg ? Math.floor(zg.czas + (Date.now() - zg.kiedy) / 1000) : Math.floor(Date.now() / 1000);
       const id = nowyId();
@@ -919,7 +946,8 @@
         else res(r.opis || 'sterownik nie przyjął PIN-u');
       };
       oczekuja.set(id, { res: mój, t0: Date.now(), co: 'PIN' }); czekaWynik = mój;
-      k.send(msg);
+      const kk = klGot(wybrany); if (!kk) { res('brak połączenia z brokerem'); return; }
+      kk.send(msg);
       setTimeout(() => { if (oczekuja.has(id)) { oczekuja.delete(id); if (czekaWynik === mój) czekaWynik = null; res('sterownik nie odpowiedział w 5 s'); } }, 5000);
     });
     /*  ⚠ Bez retained `blok` obiekt „nie istnieje" dla apki, dopóki sam nie nada —
@@ -928,18 +956,23 @@
         (retained) — subskrybujemy ją, żeby poznać obiekty, które milczą. */
     /* (subskrypcja `status` siedzi w onSuccess razem z resztą - dawny setTimeout 500 ms strzelał
        PRZED CONNACK i padał po cichu w try/catch, więc bez ?obiekt= lista bywała pusta [2026-09-09]) */
+    /*  [D-313] `_zrodlo` = wpis brokera, którym właśnie przyszła wiadomość. Paho nie podaje klienta w obsłudze,
+        więc ustawiamy to tuż przed wejściem w nią - synchronicznie, więc jest prawdziwe przez cały jej przebieg. */
+    let _zrodlo = POL[0];
     const _onMsg = k.onMessageArrived;
-    k.onMessageArrived = m => {
+    const _obsluga = m => {
       const cz = m.destinationName.split('/');
       if (cz[cz.length - 1] === 'status') {
         const pref = cz.slice(0, -1).join('/');
         if (!obiekty[pref]) obiekty[pref] = { txt: '', kiedy: 0 };
+        if (!obiekty[pref].kl) obiekty[pref].kl = _zrodlo;   /* [D-313] obiekt, który tylko ogłosił status - odpowiadamy tym samym brokerem */
         obiekty[pref].status = (m.payloadString || '').trim() || '?';   // online | offline (testament)
         if (!wybrany) { wybrany = pref; oglos(tempo); }
         oddaj(); return;
       }
       _onMsg(m);
     };
+    POL.forEach(c => { c.kl.onMessageArrived = m => { _zrodlo = c; _obsluga(m); }; });
   };
 
   window.MOST_JS = M;

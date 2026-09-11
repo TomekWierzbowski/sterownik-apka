@@ -52,6 +52,15 @@
       <p class="mala">Użytkownik brokera powstaje z nazwy: małe litery bez polskich znaków, spacje → myślnik.</p>
       <label class="zapam" style="margin-top:10px"><input type="checkbox" id="serw"> konto serwisowe — widzę wszystkie sterowniki</label>
       <p class="mala">Zaznacz TYLKO na własnym telefonie. Konto klienta widzi jeden obiekt — ten, którego nazwę podał serwis.</p>
+      <b style="display:block;margin-top:14px">Drugi serwer (zapasowy)</b>
+      <p class="mala">Sterownik umie nadawać przez dwa serwery. Podaj drugi, a aplikacja będzie słuchać obu naraz
+        i pokaże obiekt niezależnie od tego, którym akurat nadaje. Puste = tylko pierwszy.</p>
+      <label for="host2">Serwer 2</label>
+      <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="np. mqtt.mojdom.pl">
+      <label for="user2">Użytkownik 2</label>
+      <input type="text" id="user2" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <label for="pass2">Hasło 2</label>
+      <input type="password" id="pass2" autocomplete="off">
     </details>
     <div class="zapam"><input type="checkbox" id="zap" checked><label for="zap" style="margin:0">zapamiętaj na tym telefonie</label></div>
     <div class="rz"><button type="submit" id="idz">Otwórz HMI</button></div>
@@ -86,6 +95,9 @@
   el('user').value = slug(el('nazwa').value);
   /* [D-312] konto serwisowe: jawny ptaszek zamiast zgadywania z kształtu loginu; stary zapis bez pola = dawna zasada */
   el('serw').checked = (z && z.serwis !== undefined) ? !!z.serwis : (!!el('user').value && el('user').value.indexOf('-') < 0);
+  el('host2').value = (z && z.host2) || '';   /* drugi broker [D-313] - pusty znaczy „tylko pierwszy" */
+  el('user2').value = (z && z.user2) || '';
+  el('pass2').value = (z && z.pass2) || '';
   el('nazwa').addEventListener('input', () => { el('user').value = slug(el('nazwa').value); });
 
   if ('serviceWorker' in navigator) {
@@ -120,8 +132,10 @@
     const koniec = (ok, txt) => { if (gotowe) return; gotowe = true; el('idz').disabled = false;
       stan.className = 'stan ' + (ok ? 'ok' : 'zle'); stan.textContent = txt;
       if (ok) { const serwis = el('serw').checked;
-                try { if (el('zap').checked) localStorage.setItem('odbior_mqtt', JSON.stringify({ host, user, pass, nazwa, serwis }));
-                      else sessionStorage.setItem('odbior_mqtt_tmp', JSON.stringify({ host, user, pass, nazwa, serwis })); } catch(e){}
+                const host2 = el('host2').value.trim(), user2 = el('user2').value.trim(), pass2 = el('pass2').value;
+                const dane = { host, user, pass, nazwa, serwis, host2, user2, pass2 };
+                try { if (el('zap').checked) localStorage.setItem('odbior_mqtt', JSON.stringify(dane));
+                      else sessionStorage.setItem('odbior_mqtt_tmp', JSON.stringify(dane)); } catch(e){}
                 setTimeout(() => location.href = 'hmi.html?mqtt=1', 400); } };
     setTimeout(() => koniec(false, 'Broker nie odpowiada w 8 s — sprawdź zasięg i nazwę serwera.'), 8000);
     try {

@@ -1111,7 +1111,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '7e3d401147';
+window.APKA_WERSJA = '2600cde3ec';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1602,7 +1602,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-11 08:05';
+window.HMI_ZBUDOWANO = '2026-09-11 09:01';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5831,6 +5831,8 @@ window.HMI_ZBUDOWANO = '2026-09-11 08:05';
                 + '<div id="ust-ob" style="color:#d0d4da"></div>'
                 + (_pwa ? '<a href="index.html?login=1" style="display:inline-block;margin-top:12px;padding:10px 16px;border-radius:10px;background:#1e6fd9;color:#fff;text-decoration:none;font-weight:600">Zmień sterownik / hasło</a>' : '')
               + '</div>'
+              + '<div id="ust-brokery" hidden><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
+                + '<div id="ust-brokery-l"></div></div>'
               + '<div><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
                 + '<span id="chmura-w" style="font-size:12px;color:#98a0ad"></span></div>'
               + '<div style="display:flex;flex-direction:column;min-height:0"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
@@ -5917,6 +5919,21 @@ window.HMI_ZBUDOWANO = '2026-09-11 08:05';
         const stHtml = kropkaEt('sterownik', kolS, opisS);
         if (stn) stn.innerHTML = stHtml;
         const ust = document.getElementById('ust-st'); if (ust) ust.innerHTML = stHtml;
+        /*  LISTA SERWERÓW [D-313]: pokazujemy ją dopiero, gdy są dwa - przy jednym wystarczy kropka „broker" wyżej.
+            „niesie" = tym serwerem przychodzi wybrany obiekt, czyli tam jadą komendy. */
+        const ubl = document.getElementById('ust-brokery'), ublL = document.getElementById('ust-brokery-l');
+        if (ubl && ublL) {
+          const br = d.brokery || [];
+          ubl.hidden = br.length < 2;
+          if (br.length >= 2) {
+            const html = br.map(x => '<div style="margin-bottom:6px">'
+              + '<span style="color:' + (x.stan === 'ok' ? KOL.ok : x.stan === 'laczy' ? KOL.czekam : KOL.zle) + '">&#9679;</span> '
+              + '<b>serwer ' + x.nr + '</b>' + (x.niesie ? ' <span style="color:#9fd3ff">← tym nadaje wybrany obiekt</span>' : '')
+              + '<div style="color:#98a0ad;font-size:12px">' + x.host + ' · ' + x.user + ' · ' + x.temat + '</div>'
+              + '<div style="color:#d0d4da;font-size:12px">' + x.opis + '</div></div>').join('');
+            if (ublL._html !== html) { ublL._html = html; ublL.innerHTML = html; }
+          }
+        }
         const uob = document.getElementById('ust-ob');
         if (uob) uob.textContent = 'obiekt: ' + (d.obiekt ? d.obiekt.split('/').slice(1).join(' / ') : '—')
           + ((nazwaInst && nazwaInst !== user) ? ' · ' + nazwaInst : '');   /* konto serwisowe ma w „nazwie" swój login - nie powtarzamy go */
@@ -5976,6 +5993,9 @@ window.HMI_ZBUDOWANO = '2026-09-11 08:05';
          okres_s liczy „świeżość" pakietu: 3 × tempo, nie 3 × 30 s */
       window.MOST_JS.startMqtt(podajChmura, { host, port: 8884, user, pass, obiekt: _q.get('obiekt') || null,
                                               serwis: (z && z.serwis !== undefined) ? z.serwis : undefined,   /* [D-312] konto serwisowe widzi wszystkie obiekty */
+                                              host2: (z && z.host2) || _q.get('host2') || null,   /* [D-313] drugi broker - apka słucha obu naraz */
+                                              user2: (z && z.user2) || _q.get('user2') || null,
+                                              pass2: (z && z.pass2) || _q.get('pass2') || null,
                                               okres_s: 2, tempo_ms: +(_q.get('tempo') || 1000) });
     };
     if (window.Paho) start();
