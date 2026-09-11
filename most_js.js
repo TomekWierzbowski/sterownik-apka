@@ -767,14 +767,29 @@
       if (!wybrany) { wybrany = pref; oglos(tempo); }
       if (pref === wybrany) oddaj(true);
     };
-    k.onConnectionLost = r => { broker = { stan: 'zerwane', opis: 'zerwane (' + (r.errorMessage || r.errorCode) + ') - łączę ponownie…' }; czekamPoPowrocie = true; zapisz('zerwane: ' + (r.errorMessage || r.errorCode)); oddaj(); };
+    /*  KODY PAHO PO POLSKU [D-309, Tomasz 2026-09-11: „AMQJS0007E pojawia się w dzienniku łącza jako błąd"]:
+        surowy kod biblioteki wyglądał jak awaria. AMQJS0007E „Socket error" = system zamknął gniazdo WebSocket
+        (telefon w tle, zmiana WiFi→LTE, chwilowy brak zasięgu) - Paho wraca sam, więc to informacja, nie błąd.
+        Zapamiętujemy chwilę zerwania, żeby przy powrocie dopisać, ile trwała przerwa (dane do prób brzegowych). */
+    const rcZ = r => { const m = /return code:\s*(\d)/i.exec((r && r.errorMessage) || ''); return m ? +m[1] : null; };
+    const pahoTekst = r => { const m = (r && r.errorMessage) || String((r && r.errorCode) || '');
+      if (/AMQJS0007E/.test(m)) return 'gniazdo zerwane przez system (tło / zmiana sieci / zasięg)';
+      if (/AMQJS0008I/.test(m)) return 'broker zamknął połączenie';
+      if (/AMQJS0004E/.test(m)) return 'broker nie odpowiedział na ping (zasięg?)';
+      if (/AMQJSC0001E/.test(m)) return 'brak odpowiedzi brokera (limit czasu)';
+      if (/AMQJS0006E/.test(m)) return 'broker odrzucił połączenie' + (rcZ(r) !== null ? ' (kod ' + rcZ(r) + ')' : '');
+      return m.replace(/^AMQJS[C]?\d+[EI]\s*/, '') || 'powód nieznany'; };
+    let zerwaneOd = 0;
+    k.onConnectionLost = r => { const co = pahoTekst(r); zerwaneOd = Date.now();
+      broker = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' }; czekamPoPowrocie = true; zapisz('zerwane: ' + co); oddaj(); };
     /*  RECONNECT [2026-09-09]: telefon zmienia sieć (WiFi→LTE), ekran gaśnie, tunel pada -
         Paho z `reconnect:true` wraca sam (odstęp 1→128 s), a onSuccess leci przy KAŻDYM
         CONNACK, więc subskrypcje wracają razem z nim (cleanSession:true je kasuje).
         onConnected(ponownie) tylko podpisuje stan na pasku. */
     /* po PONOWNYM połączeniu prosimy o pełny blok: w czasie przerwy paczki zmian przepadły, a retained
        blok bywa do 60 s stary [D-278] */
-    k.onConnected = ponownie => { broker = { stan: 'ok', opis: ponownie ? 'połączony ponownie' : 'połączony' }; zapisz(ponownie ? 'połączony ponownie' : 'połączony'); if (ponownie && wybrany) oglos('pelny'); oddaj(); };
+    k.onConnected = ponownie => { const przerwa = (ponownie && zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - zerwaneOd) / 1000) + ' s)' : ''; zerwaneOd = 0;
+      broker = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' }; zapisz(ponownie ? 'połączony ponownie' + przerwa : 'połączony'); if (ponownie && wybrany) oglos('pelny'); oddaj(); };
     /*  POWOD ODMOWY Z CONNACK [2026-09-09]: Paho w onFailure daje errorCode = numer WŁASNEGO błędu
         (6 = „Bad Connack return code"), a kod brokera (4 = złe hasło, 5 = brak uprawnień, 3 = broker
         niedostępny) siedzi tylko w treści komunikatu - stąd wyrażenie. Dawne `errorCode === 5`
@@ -783,7 +798,6 @@
         nieudana próba (telefon bez zasięgu przy otwarciu) zostawałaby na zawsze. Ponawiamy sami
         5→10→20→40→60 s; przy złych danych logowania NIE ponawiamy - to człowiek musi poprawić. */
     let odstepPonow = 5;
-    const rcZ = r => { const m = /return code:\s*(\d)/i.exec((r && r.errorMessage) || ''); return m ? +m[1] : null; };
     const opcje = { useSSL: true, userName: o.user, password: o.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: true,
       onSuccess: () => { k.subscribe((o.temat || 'basen/+/+') + '/blok', { qos: 0 });
                          k.subscribe((o.temat || 'basen/+/+') + '/zm', { qos: 1 });      // paczki zmian [D-277]
