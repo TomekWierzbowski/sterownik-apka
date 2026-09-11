@@ -1111,7 +1111,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '83f323580d';
+window.APKA_WERSJA = 'c3450f42ed';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1602,7 +1602,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-11 14:39';
+window.HMI_ZBUDOWANO = '2026-09-11 20:51';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -9395,8 +9395,11 @@ function ekrDiag(){
    Most: pakiet `zdarzenia` (USB MBZ, co 10 s). Apka: temat MQTT `zdarzenia` (na prośbę) + `zd` (na żywo).
    Nowy kod w sterowniku = nowy wiersz w ZD_TEKST, inaczej pokaże „zdarzenie nr N".
    ============================================================ */
-const ZD_ZRODLO = ['?', 'panel', 'most', 'aplikacja', 'strona', 'pilot', 'przycisk', 'automat', 'czas', 'magistrala'];
-const ZD_KAT = { 1: 'użytkownik', 2: 'automat', 3: 'konfiguracja' };
+/*  „automat" -> „sterownik" [D-329, Tomasz: „zrodlo automat powinno byc sterownik"]: dla czytajacego
+    dziennik to sterownik podjal decyzje, a slowo „automat" brzmi jak osobne urzadzenie. Numery zrodel
+    zostaja bez zmian - ida w rejestrach. */
+const ZD_ZRODLO = ['?', 'panel', 'most', 'aplikacja', 'strona', 'pilot', 'przycisk', 'sterownik', 'czas', 'magistrala'];
+const ZD_KAT = { 1: 'użytkownik', 2: 'sterownik', 3: 'konfiguracja' };
 const ZD_HOA = ['AUTO', 'RĘKA', 'pozycja „0"'];
 const ZD_FAZA = ['spoczynek', 'dopełnienie', 'filtracja wstępna', 'płukanie', 'filtracja końcowa'];
 const ZD_START_POWOD = ['powód nieznany', 'włączenie zasilania', 'przycisk RESET', 'restart z firmware', 'wyjątek procesora', 'pies łańcuchowy przerwań', 'pies łańcuchowy zadania', 'pies łańcuchowy RTC', 'wybudzenie', 'zanik napięcia (brownout)', 'restart po SDIO', 'reset przez USB (wgranie firmware)', 'reset przez JTAG', 'błąd eFuse', 'zakłócenie zasilania', 'procesor się zawiesił'];   /* = DIAG_* z 01h_diag_start.h [D-302] */   /* = DIAG_* z 01h_diag_start.h */
@@ -9406,16 +9409,33 @@ function zdTekst(w) {
   const s16 = v => (v > 32767 ? v - 65536 : v), t10 = v => (s16(v) / 10).toFixed(1) + ' °C';
   const kan = k => (k >= 0 && k < 16) ? (AKC_NAZWY[k % 8] || ('kanał ' + k)) + (k >= 8 ? ' (obieg 2)' : '') : 'kanał ' + k;
   const wl = b ? 'załączono' : 'wyłączono';
+  /* sekundy po ludzku: 45 s · 5 min · 1 h 20 min [D-330] */
+  const czasSl = s => s < 90 ? s + ' s'
+                    : s < 5400 ? Math.round(s / 60) + ' min'
+                    : Math.floor(s / 3600) + ' h ' + Math.round((s % 3600) / 60) + ' min';
   switch (kod) {
-    case 1:  return `${kan(a)}: ${wl}`;
+    /*  [D-330, Tomasz: „wpis jest mylący, powinno być napisane upłynęło 5 min wyłączono"]: samo
+        „wyłączono" czyta się jak czynność człowieka, a najczęściej to sterownik zgasił kanał po
+        nastawionym czasie. Sterownik podaje teraz w `c` sekundy pracy - piszemy je wprost, a przy
+        źródle „zegar" mówimy wprost, że to czas graniczny. */
+    case 1:  { const ile = c ? czasSl(c) : '';
+               if (b) return `${kan(a)}: załączono`;
+               if (zr === 8) return `${kan(a)}: upłynął czas pracy${ile ? ' (' + ile + ')' : ''} — wyłączono`;
+               return `${kan(a)}: wyłączono${ile ? ' po ' + ile : ''}`; }
     case 2:  return `temperatura zadana ${obieg}: ${t10(a)}` + (c && c !== 0xFFFF ? ` (było ${t10(c)})` : '');
     case 3:  return `grzanie ${obieg}: ${b ? 'włączone' : 'wyłączone'}`;
     case 4:  return `płukanie ręczne ${obieg}: ${b ? 'przyjęte' : 'odmowa'}`;
     case 5:  return `skwitowano: ${almNazwaBit(a)}`;
     case 6:  return `skasowano zatrzask ${a === 1 ? 'pompy (manometr)' : 'awarii wodnej'} ${obieg}`;
     case 7:  return `obejście ${a === 1 ? 'sondy poziomu' : 'manometru'} ${obieg}: ${b ? 'włączone' : 'wyłączone'}`;
-    case 10: return `pompa ${obieg}: ${b ? 'START' : 'STOP'} · HOA ${ZD_HOA[a] || a}` + (c ? ` · ${ZD_FAZA[c] || 'faza ' + c}` : '');
-    case 11: return `płukanie ${obieg}: ${ZD_FAZA[a] || 'faza ' + a}` + (c ? ` (po: ${ZD_FAZA[c] || c})` : '');
+    /*  [D-331] koniec czegoś niesie DŁUGOŚĆ TRWANIA: pompa przy STOP podaje minuty pracy (przy
+        starcie w tym samym polu jest faza płukania), a płukanie - sekundy poprzedniej fazy, zaś przy
+        powrocie do spoczynku sekundy całej sekwencji. */
+    case 10: return `pompa ${obieg}: ${b ? 'START' : 'STOP'} · HOA ${ZD_HOA[a] || a}`
+                  + (b ? (c ? ` · ${ZD_FAZA[c] || 'faza ' + c}` : '')
+                       : (c ? ` · pracowała ${czasSl(c * 60)}` : ''));
+    case 11: return `płukanie ${obieg}: ${ZD_FAZA[a] || 'faza ' + a}` + (c ? ` (po: ${ZD_FAZA[c] || c})` : '')
+                  + (b ? (a === 0 ? ` · całe płukanie ${czasSl(b)}` : ` · poprzednia trwała ${czasSl(b)}`) : '');
     case 12: return `dolewanie ${obieg}: ${b ? 'START' : 'STOP'} · poziom ${c} mm`;
     case 13: return `grzanie ${obieg} źródło ${a}: ${b ? 'załączone' : 'wyłączone'} · woda ${t10(c)}`;
     case 14: return `lampa UV ${obieg}: ${b ? 'załączona' : 'wyłączona'}`;
