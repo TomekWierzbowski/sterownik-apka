@@ -718,8 +718,26 @@
         w jakim tempie (ms); po zamknięciu karty milczy sam po 60 s. Przy
         zamykaniu strony wysyłamy 0 = „przestaję patrzeć", żeby nie czekał. */
     const tempo = o.tempo_ms || 1000;
-    const oglos = v => { const kk = klGot(wybrany); if (!wybrany || !kk) return;
-      const m = new Paho.Message(String(v)); m.destinationName = wybrany + '/zadanie'; kk.send(m); ost.zadanie = Date.now(); if (v === 'pelny') zapisz('żądanie pełnego bloku'); };
+    /*  KTÓRĄ DROGĄ CIĘŻKIE TEMATY [D-321, Tomasz: „to robi apka - pełna zgoda"]: sterownik nadawał
+        każdą paczkę na oba brokery, więc jego łącze i limity brokerów płaciły dwa razy. Kto niesie
+        obiekt, wie tylko apka - z tego, którym połączeniem paczki naprawdę przychodzą (`w.kl`).
+        Mówimy to przy każdym odnowieniu żądania: `1000;niesie=1`. Zero = „nadawaj oboma" i tak samo
+        rozumie to starszy sterownik, który tego dopisku w ogóle nie zna (czyta samą liczbę). */
+    const niesieNr = () => {
+      if (POL.length < 2) return 0;
+      const w = wybrany && obiekty[wybrany];
+      const c = w && w.kl;
+      return (c && c.kl && c.kl.isConnected() && c.stan.stan === 'ok') ? c.nr : 0;
+    };
+    let niesieOst = -1;
+    const oglos = (v, niesie) => { const kk = klGot(wybrany); if (!wybrany || !kk) return;
+      let tresc = String(v);
+      if (typeof v === 'number') {                     /* dopisek tylko przy tempie, nie przy „pelny"/„okres:" */
+        const nr = (niesie === undefined) ? niesieNr() : niesie;
+        tresc += ';niesie=' + nr;
+        if (nr !== niesieOst) { niesieOst = nr; zapisz(nr ? 'proszę o ciężkie tematy serwerem ' + nr : 'proszę o ciężkie tematy OBOMA serwerami'); }
+      }
+      const m = new Paho.Message(tresc); m.destinationName = wybrany + '/zadanie'; kk.send(m); ost.zadanie = Date.now(); if (v === 'pelny') zapisz('żądanie pełnego bloku'); };
     setInterval(() => oglos(tempo), 20000);
     /* `zadanie`=0 przy pagehide ZDJĘTE [D-287]: jeden schodzący do tła podglądacz gasił strumień pozostałym; sterownik gaśnie sam 60 s po ostatnim odnowieniu */
     /*  WZNOWIENIE PODGLĄDU BEZ CZEKANIA [2026-09-09, Tomasz: „jak nie dostanie pakietu na czas,
@@ -752,15 +770,30 @@
         bo po zamrożeniu `visibilitychange` bywa nie do zobaczenia. */
     window.addEventListener('pagehide', () => zapisz('karta schowana (pagehide)'));
     document.addEventListener('freeze', () => zapisz('karta zamrożona przez przeglądarkę'));
+    /*  ZERWANIE DROGI = OD RAZU „OBA" [D-321]: gdy padnie połączenie, którym obiekt do nas dociera,
+        nie ma na co czekać - prosimy pozostałym, żeby sterownik wrócił do nadawania na oba serwery. */
+    M.niesieReset = () => { if (niesieOst !== 0 && POL.some(c => c.kl.isConnected())) oglos(tempo, 0); };
+    /*  PRÓBA BRZEGOWA [D-322]: sonda musi umieć zerwać JEDNĄ drogę, żeby zmierzyć, po ilu sekundach
+        obraz wraca drugą. Zamykamy gniazdo dokładnie tak, jak robi to sieć - reszta dzieje się sama
+        (Paho zgłasza zerwanie, apka prosi sterownik o nadawanie oboma). Nie wystawiamy tu kont ani
+        haseł - tylko tę jedną czynność. */
+    M._zerwij = nr => { const c = POL.find(x => x.nr === nr); if (!c || !c.gniazdo) return false;
+      try { c.gniazdo.close(); zapisz('próba brzegowa: zerwano serwer ' + nr); return true; } catch (e) { return false; } };
     document.addEventListener('resume', () => { zapisz('karta odmrożona'); czekamPoPowrocie = true;
       POL.filter(c => !c.kl.isConnected()).forEach(c => { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('odmrożenie'); }); oddaj(); });
     setInterval(() => { const w = wybrany && obiekty[wybrany];
-      if (brokerOgolem().stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 4000) oglosTeraz();
+      /*  [D-321] PROGI CISZY PODNIESIONE: sterownik nadaje heartbeat co 5 s (było 2 s), więc cztery
+          sekundy bez paczki to teraz normalna praca, a nie kłopot. Dopytujemy po 10 s. */
+      if (brokerOgolem().stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 10000) oglosTeraz();
       /*  [D-315] cisza u niosącego (6 s) albo jego zerwanie = wpinamy ciężkie tematy z powrotem WSZĘDZIE.
           Lepiej przez chwilę odebrać dwa razy, niż nie odebrać wcale. */
-      const cisza = !w || !w.kiedy || Date.now() - w.kiedy > 6000;
-      if (POL.length > 1 && (cisza || POL.some(c => c.lekki && c.stan.stan !== 'ok')))
+      const cisza = !w || !w.kiedy || Date.now() - w.kiedy > 12000;
+      if (POL.length > 1 && (cisza || POL.some(c => c.lekki && c.stan.stan !== 'ok'))) {
         POL.forEach(c => { c.bliz = 0; wepnijCiezkie(c); });
+        /*  [D-321] i mówimy o tym STEROWNIKOWI od ręki: niech znowu nadaje oboma. Bez tego czekałby
+            na najbliższe odnowienie żądania, czyli do 20 s ciszy na ekranie. */
+        if (niesieOst !== 0) oglos(tempo, 0);
+      }
       /*  LUKA BEZ PEŁNEGO BLOKU = ZASŁONA [D-318, audyt etapu 3 pkt 3]: po dziurze w numeracji
           w lustrze brakuje zgubionych zmian, a następne paczki lecą dalej - ekran wyglądał więc
           na świeży, choć część liczb pochodziła sprzed dziury. Pełny blok przychodzi zwykle w pół
@@ -952,6 +985,7 @@
         c.stan = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' };
         if (klDla(wybrany) === c) czekamPoPowrocie = true;
         zapisz(etyk(c) + 'zerwane: ' + co); oddaj();
+        if (M.niesieReset) M.niesieReset();   /* [D-321] padła droga, którą obiekt do nas docierał - niech sterownik wróci do nadawania oboma */
         c.odstepNr = 0; c.polaczTeraz('zerwane');   /* od razu; gdy sieci nie ma, próba padnie i pójdą odstępy */
       };
       /*  PO KAŻDYM POŁĄCZENIU: `onSuccess` (subskrypcje - cleanSession je kasuje przy zerwaniu) leci przy KAŻDYM
