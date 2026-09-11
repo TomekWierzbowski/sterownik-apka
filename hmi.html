@@ -1111,7 +1111,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '449f7e47ee';
+window.APKA_WERSJA = '79a3e97718';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1602,7 +1602,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-11 01:11';
+window.HMI_ZBUDOWANO = '2026-09-11 07:59';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5787,7 +5787,7 @@ window.HMI_ZBUDOWANO = '2026-09-11 01:11';
       /* tekst przy kropce w osobnym <i class=chm-t>: apka w trybie jednej linijki chowa tekst, zostaje kropka [D-304] */
       const kropka = (kol, txt) => '<span style="color:' + kol + '">&#9679;<i class="chm-t" style="font-style:normal"> ' + txt + '</i></span>';
       /* ETYKIETA + KROPKA [D-308, Tomasz 2026-09-11: „poł. sterownika - kropka ziel/czer, poł. brokera - kropka"]:
-         w apce (jedna linijka) widać „sterownik ●  broker ●", szczegóły (.chm-t) po rozwinięciu paska */
+         w apce (jedna linijka) widać „sterownik ●  broker ●", pełne zdania (.chm-t) w oknie USTAWIENIA [D-311] */
       const kropkaEt = (et, kol, txt) => '<span class="chm-e">' + et + ' </span><span style="color:' + kol + '">&#9679;</span><i class="chm-t" style="font-style:normal"> ' + txt + '</i>';
       const nazwaInst = (z && z.nazwa) || '';   /* nazwa sterownika/instalacji z logowania (D-304) */
       let mialDane = false, mamNumery = false; const t0Chmury = Date.now();
@@ -5806,19 +5806,46 @@ window.HMI_ZBUDOWANO = '2026-09-11 01:11';
              Wcześniej cały innerHTML paska był przepisywany przy KAŻDYM pakiecie (co ~1 s),
              więc <select> był odtwarzany i jego rozwinięta lista natychmiast się zamykała.
              Teraz select i teksty statusu to trwałe węzły; aktualizujemy tylko ich zawartość. */
-          /* UKŁAD PASKA [D-308]: sterownik ● | broker ● | nazwa instalacji (konto jednego obiektu) albo wybór obiektu
-             (konto serwisowe). Tytuł „PRZEZ CHMURĘ" zdjęty [Tomasz 2026-09-11: „tekst przez chmurę wykasuj"];
-             dziennik łącza otwiera się linkiem widocznym po rozwinięciu paska. */
+          /* UKŁAD PASKA [D-308 → D-311, Tomasz 2026-09-11: „w prawym górnym rogu zrób wejście… jako osobne okno,
+             nazwij to ustawienia"]. Pasek niesie WYŁĄCZNIE stan: sterownik ●, broker ●, nazwa instalacji (albo wybór
+             obiektu przy koncie serwisowym) i koło zębate po prawej. Logowanie, czasy i dziennik łącza przeniosły się
+             do okna USTAWIENIA - rozwijanie paska nad HMI zniknęło. */
           p.innerHTML = '<span id="chmura-st"></span>'
             + '<span id="chmura-br"></span>'
             + '<span id="chmura-ob"><b id="chmura-naz" style="font-weight:600"></b><i class="chm-t" style="font-style:normal">obiekt: </i><select id="chmura-sel" style="font:inherit" onchange="window.MOST_JS.wybierzObiekt(this.value)"></select></span>'
-            + '<b id="chmura-tyt" class="chm-t" style="cursor:pointer;font-weight:500;color:#9fd3ff" title="dziennik łącza">dziennik łącza</b>'
-            + (_pwa ? '<a href="index.html?login=1" style="color:#9fd3ff;margin-left:auto">logowanie</a>' : '')
-            + '<span id="chmura-w" style="flex-basis:100%;font-size:10px;color:#98a0ad"></span>'
-            + '<pre id="chmura-dz" style="display:none;flex-basis:100%;margin:0;max-height:40vh;overflow:auto;font:10px/1.35 ui-monospace,monospace;color:#d0d4da;white-space:pre-wrap"></pre>';
+            + '<span id="chmura-ust" title="ustawienia" style="margin-left:auto;cursor:pointer;font-size:16px;line-height:1;padding:0 2px;flex:0 0 auto">&#9881;</span>';
           document.body.appendChild(p);
-          /* DZIENNIK ZDARZEŃ pod palcem [D-278]: dotknięcie „PRZEZ CHMURĘ" rozwija ostatnie zdarzenia klienta */
-          document.getElementById('chmura-tyt').onclick = () => { const dz = document.getElementById('chmura-dz'); dz.style.display = dz.style.display === 'none' ? 'block' : 'none'; if (p._ustaw) p._ustaw(); };
+          /*  OKNO USTAWIEŃ [D-311]: osobna warstwa nad wszystkim (z-index 120 > pasek 99 > plansze 97/98), a nie
+              rozwinięty pasek - żeby HMI nie skakało i żeby dało się czytać dziennik na pełnym ekranie.
+              Elementy `chmura-w` (czasy) i `chmura-dz` (dziennik) zachowują swoje identyfikatory, bo wypełnia je
+              ten sam kod, co dotąd - zmienia się tylko miejsce, w którym wiszą. */
+          const u = document.createElement('div'); u.id = 'ustawienia';
+          u.style.cssText = 'position:fixed;inset:0;z-index:120;background:#14161a;color:#fff;display:none;'
+            + 'flex-direction:column;font:14px/1.45 system-ui,sans-serif';
+          u.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #2a2e35;flex:0 0 auto">'
+              + '<b style="font-size:16px;letter-spacing:.02em">USTAWIENIA</b>'
+              + '<span id="ust-zamknij" style="margin-left:auto;cursor:pointer;font-size:22px;line-height:1;padding:0 6px">&#10005;</span></div>'
+            + '<div style="overflow:auto;padding:14px;display:flex;flex-direction:column;gap:18px">'
+              + '<div><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">POŁĄCZENIE</div>'
+                + '<div id="ust-st" style="margin-bottom:4px"></div><div id="ust-br" style="margin-bottom:4px"></div>'
+                + '<div id="ust-ob" style="color:#d0d4da"></div>'
+                + (_pwa ? '<a href="index.html?login=1" style="display:inline-block;margin-top:12px;padding:10px 16px;border-radius:10px;background:#1e6fd9;color:#fff;text-decoration:none;font-weight:600">Zmień sterownik / hasło</a>' : '')
+              + '</div>'
+              + '<div><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
+                + '<span id="chmura-w" style="font-size:12px;color:#98a0ad"></span></div>'
+              + '<div style="display:flex;flex-direction:column;min-height:0"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
+                + '<pre id="chmura-dz" style="margin:0;max-height:46vh;overflow:auto;font:11px/1.4 ui-monospace,monospace;color:#d0d4da;white-space:pre-wrap;background:#0f1114;border-radius:6px;padding:8px"></pre></div>'
+            + '</div>';
+          document.body.appendChild(u);
+          /* dziennik wypełniamy OD RAZU po otwarciu - inaczej sekcja stała pusta do następnego pakietu */
+          const ustDziennik = () => { const dz = document.getElementById('chmura-dz');
+            const dl = (window.MOST_JS && window.MOST_JS.dziennik) || [];
+            const f = ms => { const x = new Date(ms); return x.toTimeString().slice(0, 8); };
+            const txt = dl.slice(-40).map(e => f(e.t) + ' ' + e.txt).join(String.fromCharCode(10));
+            if (dz && dz.textContent !== txt) { dz.textContent = txt; dz.scrollTop = dz.scrollHeight; } };
+          const ustPokaz = w => { u.style.display = w ? 'flex' : 'none'; if (w) ustDziennik(); };
+          document.getElementById('chmura-ust').onclick = () => ustPokaz(u.style.display === 'none');
+          document.getElementById('ust-zamknij').onclick = () => ustPokaz(false);
           /* PLANSZA „BRAK POŁĄCZENIA" - pod paskiem, nad HMI (z-index 98 < 99 paska) */
           const b = document.createElement('div'); b.id = 'chmura-brak';
           b.style.cssText = 'position:fixed;left:0;right:0;top:var(--pasek,0);bottom:0;z-index:98;background:#2a2e35;color:#fff;'
@@ -5849,7 +5876,9 @@ window.HMI_ZBUDOWANO = '2026-09-11 01:11';
         const wyd = d.wydawcy || {};
         /* BROKER */
         const ebr = document.getElementById('chmura-br');
-        if (ebr) ebr.innerHTML = kropkaEt('broker', br.stan === 'ok' ? KOL.ok : br.stan === 'laczy' ? KOL.czekam : KOL.zle, br.opis);
+        const brHtml = kropkaEt('broker', br.stan === 'ok' ? KOL.ok : br.stan === 'laczy' ? KOL.czekam : KOL.zle, br.opis);
+        if (ebr) ebr.innerHTML = brHtml;
+        const ubr = document.getElementById('ust-br'); if (ubr) ubr.innerHTML = brHtml;   /* to samo zdanie w oknie ustawień [D-311] */
         /* SELECT: przebuduj opcje tylko gdy zmienił się zestaw obiektów / ich status i użytkownik
            właśnie nie wybiera (inaczej znów gasłoby rozwinięcie). */
         const sel = document.getElementById('chmura-sel');
@@ -5876,7 +5905,7 @@ window.HMI_ZBUDOWANO = '2026-09-11 01:11';
         const w = d.obiekt ? (wyd[d.obiekt] || {}) : {};
         const stn = document.getElementById('chmura-st');
         /* KROPKA STEROWNIKA [D-308]: zielona = online I pakiety płyną; czerwona = offline (testament) albo online bez
-           pakietów, gdy już mieliśmy dane; bursztyn = jeszcze czekamy. Szczegóły w tekście po rozwinięciu. */
+           pakietów, gdy już mieliśmy dane; bursztyn = jeszcze czekamy. Pełne zdanie - w oknie ustawień. */
         let kolS, opisS;
         if (!d.obiekt) { kolS = KOL.czekam; opisS = 'czekam na listę obiektów…'; }
         else if (w.status === 'offline') { kolS = KOL.zle; opisS = 'offline (broker dostał testament)'; }
@@ -5885,7 +5914,12 @@ window.HMI_ZBUDOWANO = '2026-09-11 01:11';
           else { kolS = mialDane ? KOL.zle : KOL.czekam;
                  opisS = w.wiek_s != null ? 'online, ale ostatni pakiet ' + Math.round(w.wiek_s) + ' s temu' : 'online · czekam na pakiet…'; }
         } else { kolS = KOL.czekam; opisS = 'stan nieznany' + (w.wiek_s != null ? ' · ostatni pakiet ' + Math.round(w.wiek_s) + ' s temu' : ''); }
-        if (stn) stn.innerHTML = kropkaEt('sterownik', kolS, opisS);
+        const stHtml = kropkaEt('sterownik', kolS, opisS);
+        if (stn) stn.innerHTML = stHtml;
+        const ust = document.getElementById('ust-st'); if (ust) ust.innerHTML = stHtml;
+        const uob = document.getElementById('ust-ob');
+        if (uob) uob.textContent = 'obiekt: ' + (d.obiekt ? d.obiekt.split('/').slice(1).join(' / ') : '—')
+          + ((nazwaInst && nazwaInst !== user) ? ' · ' + nazwaInst : '');   /* konto serwisowe ma w „nazwie" swój login - nie powtarzamy go */
         /* PLANSZA TYLKO DO PIERWSZEGO PAKIETU [Tomasz 2026-09-09, 14:30: „raz na czas pokazuje się
            brak połączenia i znika HMI"]. Pierwsza wersja wracała z planszą przy brokerze straconym
            > 10 s - na telefonie (VPN, 5G, ekran gaśnie) takie przerwy są normalne i zasłanianie
@@ -5930,7 +5964,8 @@ window.HMI_ZBUDOWANO = '2026-09-11 01:11';
         if (ew) { const o = d.ost || {}; const wiek = t => t ? Math.round((Date.now() - t) / 1000) + ' s' : '—';
           ew.textContent = 'wersja ' + (d.wersja || '?') + ' · zmiany ' + wiek(o.zm) + ' · pełny blok ' + wiek(o.blok) + ' · żądanie ' + wiek(o.zadanie); }
         const dz = document.getElementById('chmura-dz');
-        if (dz && dz.style.display !== 'none' && d.dziennik) {
+        const oknoUst = document.getElementById('ustawienia');
+        if (dz && oknoUst && oknoUst.style.display !== 'none' && d.dziennik) {
           const f = t => { const x = new Date(t); return x.toTimeString().slice(0, 8); };
           const txt = d.dziennik.slice(-40).map(e => f(e.t) + ' ' + e.txt).join('\n');
           if (dz.textContent !== txt) { dz.textContent = txt; dz.scrollTop = dz.scrollHeight; }
@@ -10281,21 +10316,18 @@ body:not(.bez-wody){background:#04131f}
 body:not(.bez-wody) .bezel{background:rgba(10,30,46,.55);box-shadow:0 18px 60px rgba(0,0,0,.55)}
 body:not(.bez-wody) .screen{background:rgba(242,242,242,.84)}
 body.bez-wody #woda{display:none}
-#woda-tgl{margin-left:auto;cursor:pointer;color:#7fc7ff;user-select:none}
 /* HMI NA CAŁĄ SZEROKOŚĆ [D-304]: ramka bez marginesu (dopasuj() liczy skalę z szerokości ramki) */
 body:not(.bez-wody) .bezel,body.bez-wody .bezel{width:var(--ekr-w);height:var(--ekr-h);padding:0;border-radius:0;background:transparent;box-shadow:none}
 body:not(.bez-wody) .screen,body.bez-wody .screen{border-radius:0}
-/* PASEK CHMURY = JEDNA LINIJKA [D-304]: reszta (wersja, znaczniki, woda, logowanie) po tapnięciu w pasek */
+/* PASEK CHMURY = JEDNA LINIJKA [D-304 → D-311]: same kropki stanu i nazwa; logowanie, czasy i dziennik łącza
+   siedzą w osobnym oknie USTAWIENIA pod kołem zębatym po prawej (rozwijania paska nad HMI już nie ma). */
 #chmura{flex-wrap:nowrap!important;padding:2px 8px!important;gap:6px!important;font-size:11px!important;line-height:1.35!important;overflow:hidden;align-items:center!important}
 #chmura>span,#chmura>b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 #chmura>b{flex:0 0 auto}
 #chmura select{font-size:11px!important;max-width:38vw}
-#chmura>a,#chmura #chmura-w,#chmura #woda-tgl{display:none!important}
-#chmura:not(.rozwin) .chm-t{display:none}   /* jedna linijka: same kropki (zielona/czerwona) + wybór obiektu; tekst po rozwinięciu */
-#chmura:not(.rozwin)>b{font-size:11px}
-#chmura.rozwin{flex-wrap:wrap!important;padding:4px 10px!important;font-size:12px!important}
-#chmura.rozwin>span,#chmura.rozwin>b{white-space:normal;overflow:visible}
-#chmura.rozwin>a,#chmura.rozwin #chmura-w,#chmura.rozwin #woda-tgl{display:inline!important}
+#chmura .chm-t{display:none}            /* opisy tylko w oknie ustawień - w pasku zostają kropki */
+#ustawienia .chm-t{display:inline!important}
+#chmura-ust{font-size:15px!important}
 </style>
 <canvas id="woda" aria-hidden="true"></canvas>
 <script>
@@ -10305,7 +10337,7 @@ body:not(.bez-wody) .screen,body.bez-wody .screen{border-radius:0}
      leży pod .wrap i nie łapie dotyku. Bateria: w tle karty pętla stoi; reduced-motion = jedna klatka. */
   var c = document.getElementById('woda'); if (!c) return;
   var g = c.getContext('2d'); var W = 0, H = 0, S = 1;
-  var wl = true; try { wl = localStorage.getItem('woda') !== '0'; } catch (e) {}
+  var wl = true;   /* WODA ZAWSZE WŁĄCZONA [Tomasz 2026-09-11: „wykasuj woda wł, zawsze włączone"] - przełącznik zdjęty */
   var ruch = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   document.body.classList.toggle('bez-wody', !wl);
   function rozm() { S = Math.min(devicePixelRatio || 1, 1.5); W = innerWidth; H = innerHeight; c.width = W * S; c.height = H * S; c.style.width = W + 'px'; c.style.height = H + 'px'; g.setTransform(S, 0, 0, S, 0, 0); }
@@ -10333,13 +10365,6 @@ body:not(.bez-wody) .screen,body.bez-wody .screen{border-radius:0}
   document.addEventListener('visibilitychange', function () { if (!document.hidden) start(); });
   addEventListener('pointerdown', function () { if (wl && !ruch) requestAnimationFrame(petla); }, { passive: true });
   start();
-  /* przełącznik w pasku chmury - gdy pasek już jest (buduje go hala) */
-  var prob = 0, it = setInterval(function () { var w = document.getElementById('chmura-w'); if (!w) { if (++prob > 100) clearInterval(it); return; } clearInterval(it);
-    /* PASEK: tapnięcie w wolne miejsce paska rozwija / zwija szczegóły [D-304]; tytuł nadal otwiera dziennik */
-    var pas = document.getElementById('chmura'); if (pas) pas.addEventListener('click', function (e) { if (e.target === pas) { pas.classList.toggle('rozwin'); if (pas._ustaw) pas._ustaw(); } });
-    var s = document.createElement('span'); s.id = 'woda-tgl'; s.textContent = wl ? 'woda: wł' : 'woda: wył'; s.title = 'efekt wody w tle - włącz/wyłącz';
-    s.onclick = function () { wl = !wl; try { localStorage.setItem('woda', wl ? '1' : '0'); } catch (e) {} document.body.classList.toggle('bez-wody', !wl); s.textContent = wl ? 'woda: wł' : 'woda: wył'; start(); };
-    w.parentNode.insertBefore(s, w.nextSibling); }, 200);
 })();
 </script>
 <style>
