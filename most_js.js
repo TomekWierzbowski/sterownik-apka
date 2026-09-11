@@ -666,8 +666,13 @@
     const a1 = adres(o.host, o.port);
     const POL = [{ nr: 1, host: a1.host, port: a1.port, user: o.user, pass: o.pass, temat: o.temat }];
     if (o.host2 && o.user2) { const a2 = adres(o.host2, o.port2);
+      /*  ⚠ ZAKRES TEMATÓW BIERZEMY Z PIERWSZEGO KONTA, NIE Z DRUGIEGO [D-316, Tomasz 2026-09-11: konto klienta
+          na EMQX nazywa się `wanna-gliczarow2`, a na HiveMQ `gliczarow-wanna`]. To ten SAM obiekt i ten sam
+          prefiks tematu w sterowniku - różnią się tylko konta u dwóch dostawców. Liczenie tematu z nazwy drugiego
+          konta dawało `basen/wanna/gliczarow2`, czyli nasłuch w próżni. Nazwa konta na drugim brokerze może być
+          dowolna; `temat2` zostaje furtką, gdyby kiedyś prefiks naprawdę się różnił. */
       POL.push({ nr: 2, host: a2.host, port: a2.port, user: o.user2, pass: o.pass2,
-                 temat: o.temat2 || zakresZ(o.user2, o.serwis2 !== undefined ? o.serwis2 : o.serwis) }); }
+                 temat: o.temat2 || o.temat }); }
     POL.forEach((c, i) => { c.kl = new Klient(c.host, c.port, '/mqtt', cid + (i ? '-' + (i + 1) : ''));
                             c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; });
     const k = POL[0].kl;                    /* pierwszy broker = główny; skrót dla czytelności niżej */
@@ -818,6 +823,11 @@
           /*  TA SAMA PACZKA DRUGĄ DROGĄ [D-313]: przy dwóch brokerach (i przy powtórce QoS 1) ten sam `seq`
               potrafi przyjść dwa razy. Bez tego wyglądało to jak dziura w numeracji i apka prosiła o pełny
               blok w kółko. Powtórkę po prostu pomijamy - lustro już ją ma. */
+          /*  SPÓŹNIONA KOPIA TO TEŻ NIE LUKA [D-316]: przy dwóch brokerach ta sama paczka bywa dostarczona
+              w innej kolejności (zmierzone: „luka seq 6213→6212"), a starą już mamy nałożoną. Odsiewamy każdy
+              numer NIE NOWSZY od naszego - ale tylko gdy różnica jest mała; duży skok w dół to restart
+              sterownika albo przewinięcie licznika i wtedy naprawdę trzeba poprosić o pełny blok. */
+          if (w.seq != null && d.seq < w.seq && w.seq - d.seq < 1000) return;
           if (w.seq === d.seq) {
             /*  DOWÓD, ŻE TEN BROKER JEST NADMIAROWY [D-315]: przyniósł paczkę, którą już mamy. Po pięciu takich
                 z rzędu odpinamy od niego ciężkie tematy - ale tylko wtedy, gdy NIE jest tym, który niesie obiekt. */
