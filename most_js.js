@@ -571,11 +571,15 @@
       if (s.startsWith('/okres')) {               /* zdarzenia z okresu [D-298]: kawałki aż dalej=0 */
         const q = new URLSearchParams(s.slice(s.indexOf('?') + 1)); const kat = q.get('kat') || 'zdarzenia', od = +q.get('od') || 0, dok = +q.get('do') || 0;
         if (!wybrany || !klGot(wybrany)) return Promise.resolve(new Response(JSON.stringify({ blad: 'brak połączenia' }), { status: 200 }));
+        const stara = czekaOkres[kat];      /* [D-348] ta sama kategoria pyta ponownie - zamknij poprzednia */
+        if (stara) { clearTimeout(stara.t); delete czekaOkres[kat];
+                     stara.res(new Response(JSON.stringify({ blad: 'prośba zastąpiona nowszą' }), { status: 200 })); }
         return new Promise(res => {
-          czekaOkres = { kat, od, dok, poz: 0, linie: [], res, t: null };
-          const nastepny = () => { oglos('okres:' + kat + ':' + od + ':' + dok + ':' + czekaOkres.poz);   /* poz = kursor z odpowiedzi [D-300] */
-            czekaOkres.t = setTimeout(() => { if (czekaOkres && czekaOkres.res === res) { czekaOkres = null; res(new Response(JSON.stringify({ blad: 'sterownik nie odesłał okresu w 10 s' }), { status: 200 })); } }, 10000); };
-          czekaOkres.nastepny = nastepny; nastepny();
+          const c = { kat, od, dok, poz: 0, linie: [], res, t: null };
+          czekaOkres[kat] = c;
+          const nastepny = () => { oglos('okres:' + kat + ':' + od + ':' + dok + ':' + c.poz);   /* poz = kursor z odpowiedzi [D-300] */
+            c.t = setTimeout(() => { if (czekaOkres[kat] === c) { delete czekaOkres[kat]; res(new Response(JSON.stringify({ blad: 'sterownik nie odesłał okresu w 10 s' }), { status: 200 })); } }, 10000); };
+          c.nastepny = nastepny; nastepny();
         });
       }
       if (s.startsWith('/plik?')) {
@@ -624,7 +628,25 @@
     };
     const obiekty = {};                 /* prefiks -> {txt, kiedy, status} */
     const zdarzenia = {};               /* prefiks -> {ile, zgubione, wpisy[[czas,kat,kod,zr,ob,a,b,c]]} [D-295] */
-    let czekaPliki = null, czekaPlik = null, czekaOkres = null;   /* prośby o listę / plik / okres z karty SD [D-297/298] */
+    let czekaPliki = null, czekaPlik = null;                      /* prośby o listę / plik z karty SD [D-297] */
+    /*  PROSBA O OKRES - OSOBNA NA KAZDA KATEGORIE [D-348, 2026-09-12]
+        ------------------------------------------------------------
+        WEJSCIA:  zadania `/okres?kat=zdarzenia` i `/okres?kat=alarmy`; odpowiedzi z tematu `okres`.
+        CO Z CZEGO WYNIKA: kazda kategoria ma WLASNY wpis w tej mapie, wiec dwie prosby moga biec
+                  obok siebie; odpowiedz trafia do wlasciwej po nazwie kategorii z naglowka.
+        WYJSCIA:  rozwiazana obietnica `fetch` - zawsze, takze gdy prosba zostaje porzucona.
+
+        ⛔ DLACZEGO NIE JEDNA ZMIENNA, JAK BYLO: druga prosba nadpisywala pierwsza, a warownik
+        przy jej liczniku czasu sprawdzal `czekaOkres.res === res` - po nadpisaniu rownosc juz nie
+        zachodzila, wiec licznik MILCZAL i obietnica pierwszej prosby NIE ROZWIAZYWALA SIE NIGDY.
+        Ekran zostawal z `laduje = true`, czyli z napisem „odswiezam..." bez „odswiez" i bez
+        „pobierz CSV" - dokladnie to zglosil Tomasz o dzienniku zdarzen.
+        ⚠ Wyszlo dopiero teraz, bo do D-346 historia alarmow NIE pytala sama - trzeba bylo kliknac.
+        Odkad oba rejestry laduja 24 h same, wejscie w alarmy i zaraz w dziennik daje dwie prosby
+        pod rzad i kolizja jest codziennoscia, a nie przypadkiem.
+        ⚠ Gdy ta sama kategoria pyta drugi raz, STARA prosbe konczymy bledem zamiast ja porzucac -
+        porzucona obietnica to zawieszony ekran, a blad ma przynajmniej przycisk „odswiez". */
+    const czekaOkres = Object.create(null);
     let prosZdOst = 0;
     /* prośba o pamięć zdarzeń (RAM sterownika); przed połączeniem NIE liczy się jako próba - inaczej wstępne wczytanie
        ze startu apki (D-308) przepadało i dziennik czekał 15 s na kolejną */
@@ -854,12 +876,18 @@
         return;
       }
       if (rodzaj === 'okres') {                     /* "#kat;od;do;pomin;n;dalej\n<linie>" [D-298] */
-        if (!czekaOkres) return; const c = czekaOkres; clearTimeout(c.t);
-        const nl = m.payloadString.indexOf('\n'); const nag = m.payloadString.slice(1, nl).split(';'); const n = +nag[4], dalej = +nag[5], nast = +nag[6] || 0;
-        if (n < 0) { czekaOkres = null; c.res(new Response(JSON.stringify({ blad: 'brak karty' }), { status: 200 })); return; }
+        const nl = m.payloadString.indexOf('\n'); const nag = m.payloadString.slice(1, nl).split(';');
+        /*  [D-348] kategoria z NAGLOWKA odpowiedzi wskazuje, ktora prosbe obslugujemy - dzieki temu
+            odpowiedz o alarmach nie konczy prosby o zdarzenia (i odwrotnie). */
+        const c = czekaOkres[nag[0]];
+        if (!c) return;                             /* spozniona odpowiedz na porzucona prosbe - do kosza */
+        clearTimeout(c.t);
+        const n = +nag[4], dalej = +nag[5], nast = +nag[6] || 0;
+        if (n < 0) { delete czekaOkres[c.kat]; c.res(new Response(JSON.stringify({ blad: 'brak karty' }), { status: 200 })); return; }
         if (+nag[3] === c.poz) { c.linie = c.linie.concat(m.payloadString.slice(nl + 1).split('\n').filter(x => x.trim())); c.poz = nast; }
         if (dalej && nast) { c.nastepny(); return; }
-        czekaOkres = null; c.res(new Response(JSON.stringify({ kat: c.kat, od: c.od, do: c.dok, linie: c.linie }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        delete czekaOkres[c.kat];
+        c.res(new Response(JSON.stringify({ kat: c.kat, od: c.od, do: c.dok, linie: c.linie }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
         return;
       }
       if (rodzaj === 'plik') {                      /* kawałek pliku: "#kat/nazwa;rozmiar;od;n\n<linie>" */

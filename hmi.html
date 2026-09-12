@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '4b409fcbb9';
+window.APKA_WERSJA = '88efdec24a';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-12 21:37';
+window.HMI_ZBUDOWANO = '2026-09-12 21:59';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -9523,31 +9523,22 @@ function KATALOG_NAZWA(adr) {
   return _katNazwaMapa[adr] || null;
 }
 let zdFiltr = 0;   /* 0 wszystko, 1 użytkownik, 2 automat, 3 konfiguracja */
-/* ============================================================
-   NA KARCIE [D-297, Tomasz: „odczyt przez apkę i most"]: pliki tygodniowe z karty SD sterownika. Ta sama
-   sekcja pod Dziennikiem zdarzeń (kat=zdarzenia) i Historią alarmów (kat=alarmy). Lista przez /pliki, treść
-   przez /plik - pod mostem to USB (MBL/MBP), w apce most_js tłumaczy na MQTT. „Pobierz" = CSV do telefonu/PC.
-   ============================================================ */
-const KARTA_UI = { zdarzenia: { pliki: null, wybrany: null, linie: null, laduje: false, blad: null },
-                   alarmy:    { pliki: null, wybrany: null, linie: null, laduje: false, blad: null } };
-function kartaLista(kat) {
-  const u = KARTA_UI[kat]; if (u.laduje) return; u.laduje = true;
-  fetch('/pliki?kat=' + kat).then(r => r.json()).then(o => { u.pliki = o; u.laduje = false; srvRender(); })
-    .catch(e => { u.laduje = false; u.blad = String(e); srvRender(); });
-}
-function kartaPokaz(kat, nazwa) {
-  const u = KARTA_UI[kat]; if (u.laduje) return; u.laduje = true; u.wybrany = nazwa; u.linie = null; srvRender();
-  fetch('/plik?kat=' + kat + '&nazwa=' + encodeURIComponent(nazwa) + '&json=1').then(r => r.json())
-    .then(o => { u.laduje = false; if (o.blad) { u.blad = o.blad; } else { u.linie = (o.linie || []).filter(l => l && !l.startsWith('czas;')).map(l => l.split(';').map(Number)); } srvRender(); })
-    .catch(e => { u.laduje = false; u.blad = String(e); srvRender(); });
-}
-function kartaPobierz(kat, nazwa) {
-  fetch('/plik?kat=' + kat + '&nazwa=' + encodeURIComponent(nazwa)).then(r => r.text()).then(txt => {
-    const b = new Blob([txt], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a');
-    a.href = URL.createObjectURL(b); a.download = kat + '_' + nazwa; document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-  }).catch(e => alert('pobieranie nie wyszło: ' + e));
-}
+/*  ⛔ LISTA PLIKOW TYGODNIOWYCH Z KARTY - USUNIETA [D-347, Tomasz 2026-09-12: „usun wszystko, co jest
+    na karcie sterownika - w pwa, hmi i most; nie ma potrzeby", doprecyzowane: „chodzi na karcie
+    sterownika tekst i pod tekstem"]
+    ------------------------------------------------------------
+    CO ZNIKNELO: naglowek „NA KARCIE SD STEROWNIKA", lista plikow `tydz_*.csv` z rozmiarami, przyciski
+    „pokaz"/„pobierz" przy kazdym pliku, sekcja „Z PLIKU ..." oraz stan `KARTA_UI` i funkcje
+    `kartaLista` / `kartaPokaz` / `kartaPobierz` (po usunieciu sekcji nikt ich nie wolal - zostawienie
+    ich znaczyloby trzymanie kodu, ktory wyglada na dzialajacy i nie robi nic).
+    DLACZEGO: to byla DRUGA droga do tych samych danych. Rejestr na gorze ekranu pyta o OKRES
+    (`/okres`) i dostaje dokladnie to, czego czlowiek szuka - a lista plikow kazala mu najpierw
+    zgadnac, w ktorym tygodniu leży zdarzenie, i dopiero potem je otworzyc. Przy dwoch drogach
+    do jednej rzeczy ekran robil sie dluzszy, a odpowiedzi nie dawal szybciej.
+    ⚠ CO ZOSTAJE: „pobierz CSV" w stopce rejestru - pobiera to, co WLASNIE widac na ekranie
+    (wybrany okres), wiec droga do pliku na dysku nie ginie; ginie tylko przegladanie karty na oslep.
+    ⚠ Sterownik i most nadal UMIEJA `/pliki` i `/plik` (most.py:2420) - to jest zdjecie EKRANU,
+    nie funkcji. Gdyby kiedys wrocila potrzeba przegladania karty, wraca sam widok. */
 /* OKRES [D-298, Tomasz: „przez MQTT na żądanie z okresu"]: 24 h / 7 dni / od–do z pól daty; wynik pod listą plików */
 const OKRES_UI = { zdarzenia: { od: null, dok: null, linie: null, laduje: false, blad: null, etyk: '' }, alarmy: { od: null, dok: null, linie: null, laduje: false, blad: null, etyk: '' } };
 /*  JEDEN UKLAD DLA DZIENNIKA I DLA HISTORII ALARMOW [D-346, Tomasz 2026-09-12:
@@ -9614,9 +9605,25 @@ function okresAuto(kat) {
   if (u.linie === null) { if (!u.blad || wejscie) kartaOkresOstatnie(kat, 24); return; }
   if (wejscie && Date.now() - (u.kiedy || 0) > 20000) kartaOkresOstatnie(kat, 24, true);
 }
+/*  EKRAN NIE MOZE ZOSTAC BEZ WYJSCIA [D-348]
+    Gdyby odpowiedz nie przyszla NIGDY (zgubiona prosba, zerwane lacze w pol drogi, most bez limitu),
+    `laduje` zostaje na zawsze: stopka pokazuje „odswiezam...", a „odswiez" i „pobierz CSV" znikaja -
+    czlowiek nie ma juz czym sprobowac ponownie. Dlatego ekran ma WLASNY licznik czasu, niezalezny
+    od tego, co robi warstwa lacza.
+    ⚠ Dluzszy niz limit w most_js (10 s), zeby normalna odpowiedz zdazyla - ten licznik ma lapac
+    przypadek, w ktorym tamten w ogole nie zadzialal. */
+const OKRES_LIMIT_MS = 15000;
+let _okresNr = 0;
 function kartaOkres(kat, od, dok, etyk, cicho) {
   /* cicho [D-308]: odświeżenie w tle - stare linie zostają na ekranie do nadejścia nowych, bez „szukam na karcie…" */
   const u = OKRES_UI[kat]; if (u.laduje) return; u.laduje = true; u.od = od; u.dok = dok; u.etyk = etyk; u.blad = null;
+  const nr = ++_okresNr; u.nr = nr;                 /* [D-348] numer prosby - spozniony licznik nie ubije nowszej */
+  setTimeout(() => {
+    if (u.laduje && u.nr === nr) {
+      u.laduje = false; u.blad = 'sterownik nie odpowiedział (karta / łącze)';
+      if (SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia') srvRender(false);
+    }
+  }, OKRES_LIMIT_MS);
   if (!cicho) { u.linie = null; srvRender(); }
   fetch('/okres?kat=' + kat + '&od=' + od + '&do=' + dok).then(r => r.json())
     .then(o => { u.laduje = false; if (o.blad) u.blad = o.blad; else { u.linie = (o.linie || []).map(l => l.split(';').map(Number)); u.kiedy = Date.now(); } if (!cicho || SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia') srvRender(false); })
@@ -9668,26 +9675,6 @@ function kartaOkresPobierz(kat) {
     ekranem okresu, ktory NIE ladowal sie sam - czyli dokladnie tym, na co Tomasz narzekal
     („alarmy nie laduja sie same, trzeba kliknac ostatnie 24h"). Zastepuja ja `okresPaski`,
     `okresStopka` i `okresAuto`, wspolne z dziennikiem zdarzen. */
-function sekcjaKarta(kat, wiersz, przygotuj) {
-  const u = KARTA_UI[kat];
-  if (!u.pliki && !u.laduje && !u.blad) kartaLista(kat);
-  const kb = n => (n < 1024 ? n + ' B' : (n / 1024).toFixed(1) + ' kB');
-  let s = `<div class="grupka" data-lv="g">NA KARCIE SD STEROWNIKA</div>`;
-  if (u.blad) s += `<div class="nota" data-lv="nota">${u.blad}</div>`;
-  else if (!u.pliki) s += `<div class="nota" data-lv="nota">pytam sterownik o pliki…</div>`;
-  else if (u.pliki.karta === false) s += `<div class="nota" data-lv="nota">brak karty w sterowniku — ${kat === 'alarmy' ? 'historia' : 'dziennik'} tylko w pamięci ulotnej</div>`;
-  else if (u.pliki.karta === null) s += `<div class="nota" data-lv="nota">sterownik nie odpowiedział (karta / łącze)</div>`;
-  else if (!u.pliki.pliki.length) s += `<div class="nota" data-lv="nota">karta jest, plików jeszcze nie ma</div>`;
-  else s += u.pliki.pliki.map(p => `<div class="mrow" data-lv="o"><span class="t">tydzień od ${p.nazwa.replace(/^tydz_/, '').replace(/\.csv$/, '')}<i>${kb(p.rozmiar)}</i></span>
-      <span class="abtn" data-lv="abtn" onclick="kartaPokaz('${kat}','${p.nazwa}')">${u.wybrany === p.nazwa ? 'odśwież' : 'pokaż'}</span>
-      <span class="abtn" data-lv="abtn" onclick="kartaPobierz('${kat}','${p.nazwa}')">pobierz</span></div>`).join('');
-  if (u.wybrany) {
-    s += `<div class="grupka" data-lv="g">Z PLIKU ${u.wybrany.replace(/^tydz_/, 'TYDZIEŃ OD ').replace(/\.csv$/, '')}</div>`;
-    if (u.laduje) s += `<div class="nota" data-lv="nota">wczytuję z karty…</div>`;
-    else if (u.linie) { const w = przygotuj ? przygotuj(u.linie) : u.linie.slice().reverse(); s += (w.length ? w.map(wiersz).join('') : `<div class="nota" data-lv="nota">plik pusty</div>`) + `<div class="nota" data-lv="nota">${w.length} wpisów w pliku (najnowsze na górze)</div>`; }
-  }
-  return s;
-}
 /* ============================================================
    DZIENNIK ZDARZEŃ - UKŁAD [D-299, Tomasz 2026-09-10 15:45]: „na górze wybór w prostokątach: ostatnie 24 h,
    drugi prostokąt zakres od kiedy do kiedy; pod tym bloczki do zaznaczania: wprowadzone zmiany, zdarzenia
@@ -9723,8 +9710,10 @@ function ekrZdarzenia(){
       : `<div class="zdtabw"><table class="zdtab" data-lv="o"><thead><tr><th>#</th><th>czas</th><th>zdarzenie</th><th>źródło</th></tr></thead><tbody>`
         + pokaz.map((x, i) => `<tr class="k${x[1]}"><td class="nr">${i + 1}</td><td>${kiedy(x[0])}</td><td>${zdTekst(x)}</td><td>${ZD_ZRODLO[x[3]] || x[3]}</td></tr>`).join('')
         + `</tbody></table></div>`}
+    ${pokaz ? `<div class="nota" data-lv="nota">${(u.linie && !u.blad) ? `${u.etyk} · z karty sterownika`
+                                                  : 'pamięć sterownika od startu (restart ją kasuje)'}</div>` : ''}
+    ${u.blad && !u.laduje ? `<div class="nota" data-lv="nota">karta: ${u.blad}</div>` : ''}
     ${okresStopka('zdarzenia')}
-    ${sekcjaKarta('zdarzenia', x => zdKatWl[x[1]] ? `<div class="mrow odczyt" data-lv="o"><span class="t">${zdTekst(x)}<i>${kiedy(x[0])} · ${ZD_ZRODLO[x[3]] || x[3]}</i></span></div>` : '')}
   </div>` + pasek('SERWIS · dziennik zdarzeń', 'serwis');
 }
 function ekrHistoria(){
@@ -9743,8 +9732,10 @@ function ekrHistoria(){
        wpisy „ustapil" (x[1]==0) zjadaly polowe listy, a mowia tylko
        tyle, ze bylo i przeszlo - czas ustania widac po nastepnym
        wpisie tego samego bitu. */
-    /* [D-308] epizody zamiast każdego podniesienia: almSklej; wiersz = nazwa + czas PIERWSZEGO + „×n" gdy odbijał */
-    const wierszAlm = e => `<div class="mrow odczyt" data-lv="o"><span class="t">${nazwa(e.bit)}<i>${kiedy(e.czas)}${e.n > 1 ? ' · ×' + e.n : ''}</i></span></div>`;
+    /*  [D-308] epizody zamiast kazdego podniesienia: `almSklej` skleja alarm odbijajacy w jeden wpis
+        z czasem PIERWSZEGO wystapienia i liczba powtorzen.
+        ⛔ `wierszAlm` (wiersz w formie `mrow odczyt`) USUNIETY [D-347] - po zdjeciu sekcji karty SD
+        nikt go juz nie wolal, bo tabela rysuje wiersze sama. */
     const epizody = lin => almSklej(lin.filter(x => x[2]).map(x => ({ bit: x[1], czas: x[0] })));   /* linie CSV: czas;bit;pojawil */
     /*  TEN SAM UKLAD, CO DZIENNIK ZDARZEN [D-346, Tomasz 2026-09-12: „takie zrob w alarmach"]
         ------------------------------------------------------------
@@ -9779,7 +9770,6 @@ function ekrHistoria(){
       ${w ? `<div class="nota" data-lv="nota">${zrodlo}</div>` : ''}
       ${u.blad && !u.laduje ? `<div class="nota" data-lv="nota">karta: ${u.blad}</div>` : ''}
       ${okresStopka('alarmy')}
-      ${sekcjaKarta('alarmy', wierszAlm, epizody)}
     </div>` + pasek('SERWIS · historia alarmów', 'serwis');
   }
   const wpisy = [
