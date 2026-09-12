@@ -1032,7 +1032,9 @@
         color:#5d6470;padding:1px 4px 1px;text-transform:uppercase}.srv .mrow.odczyt{cursor:default}.srv .mrow.odczyt:active{background:#fff}
 
   /* ptaszek serwisowy (opcje WŁ/WYŁ) — kwadrat, nie suwaczek z telefonu */
-  /* DZIENNIK ZDARZEŃ [D-299b]: wąskie paski wyboru (wybrany = podświetlona ramka), mini-ptaszki, tabela z numerem */.srv .zdpas{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px;padding:3px 10px;border:2px solid #cfd3d8;border-radius:5px;background:#fff;cursor:pointer}.srv .zdpas.akt{border-color:#14161a;background:#14161a;color:#fff}.srv .zdpas-t{font-size:15px;font-weight:600;white-space:nowrap}.srv .zdpas-i{font-size:13px;color:#5d6470;font-weight:500}.srv .zdpas.akt .zdpas-i{color:#cfd3d8}.srv .zdzakres{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:14px;font-weight:500}.srv .zdzakres input{font:inherit;font-size:14px;padding:1px 4px;border:1px solid #cfd3d8;border-radius:4px;background:#fff;color:#14161a}.srv .zdpas.akt .abtn{background:#fff;color:#14161a}.srv .zdkaty{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}.srv .zdkaty .mrow.zdmini{flex:1 1 30%;min-width:140px;min-height:30px;padding:2px 8px;gap:6px}.srv .zdkaty .mrow.zdmini .ptaszek{width:18px;height:18px}.srv .zdkaty .mrow.zdmini .t{font-size:14px;font-weight:600}.srv .zdtabw{overflow:auto;flex:0 0 auto;max-height:52vh;border:1px solid #dcdcdc;border-radius:4px;background:#fff}.srv .zdtab{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}.srv .zdtab th, .srv .zdtab td{border-bottom:1px solid #dcdcdc;padding:5px 6px;text-align:left;vertical-align:top}.srv .zdtab th{background:#e9ebee;font-weight:600;position:sticky;top:0}.srv .zdtab td.nr{color:#98a0ad;text-align:right;padding-right:4px}.srv .zdtab td{color:#14161a}   /* CAŁA treść ciemna [Tomasz 2026-09-11: „teksty jak »oświetlenie białe wyłączono« są jasno"] */.srv .zdtab td:nth-child(2){white-space:nowrap}.srv .zdtab td:last-child{white-space:nowrap}.srv .zdtab tr.k3 td{color:#7a5200}.srv .ptaszek{width:22px;height:22px;border:2px solid #5d6470;border-radius:4px;flex:0 0 auto;
+  /* DZIENNIK ZDARZEŃ [D-299b]: wąskie paski wyboru (wybrany = podświetlona ramka), mini-ptaszki, tabela z numerem */.srv .zdpas{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px;padding:3px 10px;border:2px solid #cfd3d8;border-radius:5px;background:#fff;cursor:pointer}.srv .zdpas.akt{border-color:#14161a;background:#14161a;color:#fff}.srv .zdpas-t{font-size:15px;font-weight:600;white-space:nowrap}.srv .zdpas-i{font-size:13px;color:#5d6470;font-weight:500}.srv .zdpas.akt .zdpas-i{color:#cfd3d8}.srv .zdzakres{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:14px;font-weight:500}.srv .zdzakres input{font:inherit;font-size:14px;padding:1px 4px;border:1px solid #cfd3d8;border-radius:4px;background:#fff;color:#14161a}.srv .zdpas.akt .abtn{background:#fff;color:#14161a}.srv .zdkaty{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}.srv .zdkaty .mrow.zdmini{flex:1 1 30%;min-width:140px;min-height:30px;padding:2px 8px;gap:6px}.srv .zdkaty .mrow.zdmini .ptaszek{width:18px;height:18px}.srv .zdkaty .mrow.zdmini .t{font-size:14px;font-weight:600}.srv .zdtabw{overflow:auto;flex:0 0 auto;max-height:52vh;border:1px solid #dcdcdc;border-radius:4px;background:#fff}.srv .zdtab{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}.srv .zdtab th, .srv .zdtab td{border-bottom:1px solid #dcdcdc;padding:5px 6px;text-align:left;vertical-align:top}.srv .zdtab th{background:#e9ebee;font-weight:600;position:sticky;top:0}.srv .zdtab td.nr{color:#98a0ad;text-align:right;padding-right:4px}
+  /* [D-344] wiersze alarmow SA klikalne (otwieraja podekran) - w dzienniku nie sa,
+     wiec rece trzeba pokazac, ze tu mozna nacisnac */.srv .zdtab tbody tr[onclick]{cursor:pointer}.srv .zdtab tbody tr[onclick]:active{background:#eef1f4}.srv .zdtab td{color:#14161a}   /* CAŁA treść ciemna [Tomasz 2026-09-11: „teksty jak »oświetlenie białe wyłączono« są jasno"] */.srv .zdtab td:nth-child(2){white-space:nowrap}.srv .zdtab td:last-child{white-space:nowrap}.srv .zdtab tr.k3 td{color:#7a5200}.srv .ptaszek{width:22px;height:22px;border:2px solid #5d6470;border-radius:4px;flex:0 0 auto;
            display:flex;align-items:center;justify-content:center;background:#fff}.srv .ptaszek svg{width:15px;height:15px;display:none}.srv .mrow.wl .ptaszek{background:#14161a;border-color:#14161a}.srv .mrow.wl .ptaszek svg{display:block;color:#fff}
 
   /* przyciski akcji na ekranach */.srv .abtn{flex:0 0 auto;min-height:44px;border-radius:6px;border:1px solid #14161a;
@@ -1111,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'c3450f42ed';
+window.APKA_WERSJA = '4b409fcbb9';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1602,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-11 20:51';
+window.HMI_ZBUDOWANO = '2026-09-12 21:37';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -6563,6 +6565,21 @@ function lancuch(kand){
      pompy, więc musi leżeć powyżej progu STOP suchobiegu. */
   if (!(0 < c.sucho_stop))                 return 'próg „suchobieg pompa STOP" musi być > 0';
   if (!(c.sucho_stop < c.dol_start))       return 'start dolewania musi być powyżej progu „suchobieg pompa STOP" — to on zdejmuje suchobieg';
+  /* MINIMALNY ROZSTAW TEJ PARY [D-339, Tomasz 2026-09-12] — ta sama liczba co
+     w firmware (POZIOM_MIN_ROZSTAW_MM, 00_config.h) i w panelu (srv_katalog.c).
+     Po D-96 powrót z suchobiegu siedzi NA progu startu dolewania, więc progi
+     postawione obok siebie znaczą brak histerezy: szum pomiaru i falujące
+     lustro przerzucają flagę, a pompa startuje i staje.
+     ⚠ TEN PLIK JEST ŹRÓDŁEM, NIE TYM, CO SERWUJE MOST. Po każdej zmianie tego
+     łańcucha trzeba przegenerować sklejki: makiety/zbuduj_hmi.py (→ panel4_hmi.html,
+     z niej bierze webhmi przez narzedzia_hmi/zbuduj_webhmi.py), makiety/zbuduj_duo.ps1
+     i makiety/zbuduj_86.py. Bez tego most i strona ze sterownika zostają ze STARYM
+     ogniwem i przyjmą nastawę, której sterownik nie przyjmie.
+     ⚠ Ten łańcuch NIE jest kopią firmware'owego: nie ma tu ogniwa histerezy
+     nadmiaru (firmware i panel je mają) — rozjazd zastany, nie zamknięty tu. */
+  const MIN_ROZSTAW_MM = 10;
+  if (!(c.dol_start - c.sucho_stop >= MIN_ROZSTAW_MM))
+                                           return 'suchobieg i start dolewania muszą dzielić co najmniej ' + MIN_ROZSTAW_MM + ' mm — inaczej flaga suchobiegu przerzuca się od samego szumu pomiaru, a pompa startuje i staje';
   if (!(c.dol_start < c.dol_stop))         return 'stop dolewania musi być powyżej startu';
   if (!(c.dol_stop <= c.kal_poz_zak))      return 'stop dolewania ponad zakresem sondy';
   if (c.uklad==='przelew'){
@@ -6770,6 +6787,12 @@ function idz(ekran, kier){
   if (SRV_S.ekran==='diag' && ekran!=='diag'){
     SRV_S.serw_tryb = false; SRV_S.serw_do = [false,false,false,false,false,false];
   }
+  /*  [D-344] Zanim opuscimy ekran, zapamietaj, jak daleko byl przewiniety.
+      Robimy to TU, a nie w `srvRender()`, bo tutaj jeszcze stoi stara tresc. */
+  try {
+    const _scr = document.getElementById('scr');
+    if (_scr && SRV_S.ekran && SRV_S.ekran !== ekran) _przewPamiec[SRV_S.ekran] = SRV__przewZapisz(_scr);
+  } catch (e) {}
   SRV_S.ekran = ekran; SRV_S.kier = kier || 'wglab'; srvRender();
 }
 
@@ -9176,15 +9199,58 @@ function ekrAlarmy(){
     ${ile ? `<div class="ostrzega" data-lv="ostrzega"><b>Wyciszonych pozycji: ${ile}.</b>
       Ustawienie siedzi w pamięci trwałej sterownika i przetrwa zanik zasilania —
       nie wygasa samo.</div>` : ''}
-    ${ALARMY_LISTA.map(g => `
-      <div class="grupka" data-lv="g">${g[0]}</div>
-      ${g[1].map(a => almWiersz(a)).join('')}`).join('')}
+    ${almTabela()}
   </div>` + pasek('SERWIS · wyłączanie alarmów', 'serwis');
+}
+
+/*  TEN SAM UKLAD, CO DZIENNIK ZDARZEN [D-344, Tomasz 2026-09-12: „menu alarmy zrob takie samo
+    jak menu dziennik zdarzen, bo wygladaja inaczej, a dziennik jest lepszy"]
+    ------------------------------------------------------------
+    WEJSCIA:  `ALARMY_LISTA` - te same pozycje, co dotad.
+    CO Z CZEGO WYNIKA: jedna tabela zamiast listy wierszy pociętej naglowkami kategorii.
+    WYJSCIA:  ta sama nawigacja - tapniecie wiersza otwiera podekran alarmu (`almOtworz`).
+
+    ⛔ BEZ KATEGORII I BEZ PTASZKOW - tak zdecydowal Tomasz. Kategorie dzielily liste na
+    kilka krotkich kawalkow i to wlasnie one sprawialy, ze ekran wygladal inaczej niz dziennik.
+    Ptaszkow tu nie bylo i nie dokladamy: w dzienniku sluza do FILTROWANIA kategorii, a skoro
+    kategorii nie ma, nie ma czego filtrowac.
+    ⚠ NIC NIE UBYWA Z TRESCI: nazwa, „zatrzymuje" i stan wyciszenia zostaja - zmienila sie
+    wylacznie forma. Wiersz nadal jest czysta nawigacja, a ptaszki wyciszania mieszkaja
+    na podekranie [D-114], gdzie czerwone ostrzezenie ma pelny ekran.
+    ⚠ Numer w pierwszej kolumnie mowi, ILE ich jest - dokladnie tak, jak w dzienniku
+    [Tomasz 2026-09-10: stopki z liczba wpisow nie generujemy, numer w tabeli ja niesie]. */
+function almTabela(){
+  const lista = [];
+  ALARMY_LISTA.forEach(g => g[1].forEach(a => lista.push(a)));
+  /*  ⚠ TABELA JEST RENDEREM DLA PRZEGLADARKI, NIE UKLADEM DLA PANELU
+      [Tomasz 2026-09-12: „uklad ten sam, tylko srvRender inny" - bo LVGL ma ograniczenia].
+      Dlatego NIE dajemy jej `data-lv`: inwentarz wzialby cala tabele za JEDEN odczyt
+      i panel dostalby zamiast listy alarmow pojedynczy wiersz. Dziennik zdarzen rozwiazuje
+      to tak samo - tabela dla web, a osobno wiersze `.mrow odczyt` dla panelu.
+      ⛔ RENDER DLA LVGL JESZCZE NIE ISTNIEJE. Kolejnosc prac ustalona z Tomaszem: najpierw
+      PWA, potem most i panel na jej podstawie. Do tego czasu panel pokazuje alarmy po staremu
+      (wiersze z `almWiersz` skladane recznie w EL_*_EXTRA) - i tak ma byc, a nie „prawie". */
+  return `<div class="zdtabw"><table class="zdtab">
+      <thead><tr><th>#</th><th>alarm</th><th>zatrzymuje</th><th>stan</th></tr></thead><tbody>`
+    + lista.map((a, i) => {
+        const wyc = almWycAll(a), czesc = !wyc && almWycAny(a);
+        const stan = wyc ? '<span class="w zle">WYŁĄCZONY</span>'
+                   : czesc ? '<span class="w zle">CZĘŚCIOWO</span>' : '';
+        return `<tr onclick="almOtworz('${a.id}')">
+            <td class="nr">${i + 1}</td>
+            <td>${a.nazwa}</td>
+            <td>${a.blok ? a.blok.split(' — ')[0] : '—'}</td>
+            <td>${stan}</td></tr>`;
+      }).join('')
+    + `</tbody></table></div>`;
 }
 
 /* WIERSZ LISTY = CZYSTA NAWIGACJA [D-114]. Szczegoly i ptaszki
    mieszkaja na PODEKRANIE - czerwone ostrzezenie dostaje tam pelny
-   ekran, a lista nie skacze przy rozwijaniu. */
+   ekran, a lista nie skacze przy rozwijaniu.
+   ⚠ OD D-344 LISTA ALARMOW UZYWA TABELI (`almTabela`), nie tej funkcji - zostaje ona
+   wylacznie na wypadek, gdyby ktos potrzebowal pojedynczego wiersza w dawnej formie.
+   Jesli za miesiac nadal nikt jej nie wola, skasowac zamiast utrzymywac dwie formy. */
 function almWiersz(a){
   const wyc = almWycAll(a), czesc = !wyc && almWycAny(a);
   return `<div class="mrow" onclick="almOtworz('${a.id}')">
@@ -9484,6 +9550,70 @@ function kartaPobierz(kat, nazwa) {
 }
 /* OKRES [D-298, Tomasz: „przez MQTT na żądanie z okresu"]: 24 h / 7 dni / od–do z pól daty; wynik pod listą plików */
 const OKRES_UI = { zdarzenia: { od: null, dok: null, linie: null, laduje: false, blad: null, etyk: '' }, alarmy: { od: null, dok: null, linie: null, laduje: false, blad: null, etyk: '' } };
+/*  JEDEN UKLAD DLA DZIENNIKA I DLA HISTORII ALARMOW [D-346, Tomasz 2026-09-12:
+    „w dzienniku zdarzen kafel jest rejestr - ostatnie 24 h i drugi rejestr od do, przelaczane -
+    i takie zrob w alarmach"]
+    ------------------------------------------------------------
+    WEJSCIA:  `kat` - 'zdarzenia' albo 'alarmy'; stan okresu z `OKRES_UI[kat]`.
+    CO Z CZEGO WYNIKA: gora obu ekranow to te same dwa waskie paski - „ostatnie 24 h" i „od - do".
+              Wybrany ma ramke (klasa `akt`); pola daty pokazuja sie dopiero po tapnieciu w drugi pasek.
+    WYJSCIA:  `okresPaski(kat)` - gora ekranu, `okresStopka(kat)` - „pobierz CSV" i „odswiez".
+
+    PO CO WSPOLNY KOD, a nie kopia: ekrany rozjechaly sie wlasnie dlatego, ze kazdy mial swoj wlasny
+    naglowek [Tomasz 2026-09-12: „menu alarmy zrob takie samo jak menu dziennik zdarzen, bo wygladaja
+    inaczej"]. Dwie kopie rozjada sie znowu przy pierwszej poprawce - wiec uklad ma JEDNO zrodlo,
+    a osobne zostaje tylko to, co naprawde sie rozni (tresc tabeli).
+    ⛔ „OSTATNIE 7 DNI" ZNIKA [Tomasz 2026-09-12: „wykasuj ostatnie 7 dni z alarmow"]. Dziennik
+    nigdy tego przycisku nie mial - tydzien wybiera sie zakresem dat, wiec trzeci przycisk byl
+    skrotem do jednego z nieskonczenie wielu zakresow.
+    ⚠ Adres `data-lv` jest OSOBNY per ekran (c.zdtryb / c.almtryb) - to dwa rozne przelaczniki
+    w panelu, mimo ze srvRender maja wspolny. */
+const OKRES_TRYB = { zdarzenia: '24h', alarmy: '24h' };     /* '24h' | 'zakres' */
+function okresWybierz(kat, tryb) {
+  OKRES_TRYB[kat] = tryb;
+  if (tryb === '24h') { const u = OKRES_UI[kat]; if (!u.laduje) kartaOkresOstatnie(kat, 24); }
+  else srvRender();
+}
+function okresPaski(kat) {
+  const u = OKRES_UI[kat], tr = OKRES_TRYB[kat], adr = (kat === 'alarmy') ? 'c.almtryb' : 'c.zdtryb';
+  return `<div class="zdpas${tr === '24h' ? ' akt' : ''}" data-lv="${adr}" onclick="okresWybierz('${kat}','24h')"><span class="zdpas-t">Rejestr · ostatnie 24 h</span></div>`
+       + `<div class="zdpas${tr === 'zakres' ? ' akt' : ''}" data-lv="${adr}" onclick="okresWybierz('${kat}','zakres')"><span class="zdpas-t">Rejestr · od – do</span>${
+           tr === 'zakres'
+             ? `<span class="zdzakres" onclick="event.stopPropagation()"><input type="date" id="okres-od-${kat}" value="${u.odTxt || ''}"> – <input type="date" id="okres-do-${kat}" value="${u.doTxt || ''}"> <span class="abtn" data-lv="abtn" onclick="kartaOkresPola('${kat}')">pokaż</span></span>`
+             : `<span class="zdpas-i">${u.odTxt && u.doTxt ? u.odTxt + ' – ' + u.doTxt : 'tapnij, podaj daty'}</span>`}</div>`;
+}
+function okresStopka(kat) {
+  const u = OKRES_UI[kat];
+  return `<div class="nota" data-lv="nota" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      ${u.linie ? `<span class="abtn" data-lv="abtn" onclick="kartaOkresPobierz('${kat}')">pobierz CSV</span>` : ''}
+      ${!u.laduje ? `<span class="abtn" data-lv="abtn" onclick="${OKRES_TRYB[kat] === '24h' ? `kartaOkresOstatnie('${kat}',24)` : `kartaOkresPola('${kat}')`}">odśwież</span>`
+                  : `<span class="zdpas-i">odświeżam…</span>`}</div>`;
+}
+/*  OSTATNIE 24 h SAME, PRZY KAZDYM WEJSCIU [D-346, Tomasz 2026-09-12: „chodzi o to, zeby jak wejde
+    w alarmy albo dziennik, defaultowo ladowalo ostatnie 24h"]
+    ------------------------------------------------------------
+    WEJSCIA:  `kat`; stan `OKRES_UI[kat]`; `SRV_S.ekran` i `SRV__przewEkran` (poprzednio narysowany ekran).
+    CO Z CZEGO WYNIKA: trzy sytuacje, celowo rozdzielone -
+      1. nie mamy NIC        -> pytamy glosno (ekran pokaze „szukam na karcie...");
+      2. WCHODZIMY na ekran, a dane sa starsze niz 20 s -> pytamy CICHO (stara tabela zostaje
+         pod palcem, podmienia sie dopiero, gdy przyjdzie nowa - bez mrugania);
+      3. ten sam ekran przerysowany paczka ze sterownika -> NIE pytamy o nic.
+    WYJSCIA:  zadanie `/okres` do sterownika albo cisza.
+
+    ⚠ NA CZYM POLEGA „WEJSCIE": `SRV__przewEkran` jest ustawiany na KONCU `srvRender()`, wiec w funkcji
+    budujacej ekran trzyma jeszcze POPRZEDNI ekran. Rownosc rozstrzyga wiec: pierwszy srvRender po
+    wejsciu czy kolejny. To ten sam sygnal, z ktorego korzysta pamiec przewiniecia [D-344].
+    ⛔ NIE PONAWIAMY W KOLKO PRZY BLEDZIE. Sadzawka nie ma karty i odpowiada bledem; gdyby warunek
+    pytal mimo bledu przy kazdym renderze, apka pytalaby kilka razy na sekunde w nieskonczonosc.
+    Po bledzie probujemy PONOWNIE DOPIERO PRZY NASTEPNYM WEJSCIU na ekran - czlowiek, ktory wraca,
+    dostaje swieza probe, a ekran zostawiony otwarty nie dobija lacza. */
+function okresAuto(kat) {
+  const u = OKRES_UI[kat];
+  if (OKRES_TRYB[kat] !== '24h' || u.laduje) return;      /* zakres wybral czlowiek - nie nadpisujemy */
+  const wejscie = (SRV_S.ekran !== SRV__przewEkran);
+  if (u.linie === null) { if (!u.blad || wejscie) kartaOkresOstatnie(kat, 24); return; }
+  if (wejscie && Date.now() - (u.kiedy || 0) > 20000) kartaOkresOstatnie(kat, 24, true);
+}
 function kartaOkres(kat, od, dok, etyk, cicho) {
   /* cicho [D-308]: odświeżenie w tle - stare linie zostają na ekranie do nadejścia nowych, bez „szukam na karcie…" */
   const u = OKRES_UI[kat]; if (u.laduje) return; u.laduje = true; u.od = od; u.dok = dok; u.etyk = etyk; u.blad = null;
@@ -9495,7 +9625,11 @@ function kartaOkres(kat, od, dok, etyk, cicho) {
 function kartaOkresOstatnie(kat, godzin, cicho) {
   /* „teraz" ze zegara sterownika (blok) - telefon może mieć inną strefę; zapas 5 min w przód */
   const teraz = (SRV_S.czasSter || Math.floor(Date.now() / 1000)) + 300;
-  kartaOkres(kat, teraz - godzin * 3600 - 300, teraz, godzin >= 48 ? 'ostatnie ' + Math.round(godzin / 24) + ' dni' : 'ostatnie ' + godzin + ' h', cicho);
+  /*  [D-346] Galaz „godzin >= 48 -> ostatnie N dni" USUNIETA razem z przyciskiem „ostatnie 7 dni" -
+      nikt juz nie wola tej funkcji z wiecej niz dobą, a etykieta, ktorej nie da sie zobaczyc, jest
+      dokladnie tym rodzajem kodu, ktory wyglada na dzialajacy i nie robi nic. Parametr `godzin`
+      zostaje - jest uzywany. */
+  kartaOkres(kat, teraz - godzin * 3600 - 300, teraz, 'ostatnie ' + godzin + ' h', cicho);
 }
 /* DZIENNIK OD STARTU APKI [D-308, Tomasz 2026-09-11: „dziennik zdarzeń powinien być ładowany zaraz po uruchomieniu apki,
    a nie w momencie wejścia w dziennik"]. Po pierwszym pakiecie z zegarem sterownika pytamy o ostatnie 24 h (karta) i o
@@ -9514,7 +9648,7 @@ function zdWczytajOdStartu(nowe) {
     if (!u.blad || brakLacza) kartaOkresOstatnie('zdarzenia', 24, true);
     return;
   }
-  if (nowe && zdTryb === '24h' && u.linie && !u.laduje && Date.now() - (u.kiedy || 0) > 20000) kartaOkresOstatnie('zdarzenia', 24, true);
+  if (nowe && OKRES_TRYB.zdarzenia === '24h' && u.linie && !u.laduje && Date.now() - (u.kiedy || 0) > 20000) kartaOkresOstatnie('zdarzenia', 24, true);
 }
 function kartaOkresPola(kat) {
   const a = document.getElementById('okres-od-' + kat), b = document.getElementById('okres-do-' + kat);
@@ -9530,20 +9664,10 @@ function kartaOkresPobierz(kat) {
   a.href = URL.createObjectURL(b); a.download = kat + '_' + u.etyk.replace(/[^0-9A-Za-z–-]+/g, '_') + '.csv'; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
-function sekcjaOkres(kat, wiersz, przygotuj) {   /* przygotuj(lista) - np. sklejanie epizodów alarmów [D-308] */
-  const u = OKRES_UI[kat];
-  let s = `<div class="grupka" data-lv="g">Z OKRESU (z karty)</div>
-    <div class="nota" data-lv="nota" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <span class="abtn" data-lv="abtn" onclick="kartaOkresOstatnie('${kat}',24)">ostatnie 24 h</span>
-      <span class="abtn" data-lv="abtn" onclick="kartaOkresOstatnie('${kat}',168)">ostatnie 7 dni</span>
-      <input type="date" id="okres-od-${kat}" style="font:inherit"> – <input type="date" id="okres-do-${kat}" style="font:inherit">
-      <span class="abtn" data-lv="abtn" onclick="kartaOkresPola('${kat}')">pokaż</span>
-      ${u.linie ? `<span class="abtn" data-lv="abtn" onclick="kartaOkresPobierz('${kat}')">pobierz CSV</span>` : ''}</div>`;
-  if (u.laduje) s += `<div class="nota" data-lv="nota">szukam na karcie…</div>`;
-  else if (u.blad) s += `<div class="nota" data-lv="nota">${u.blad}</div>`;
-  else if (u.linie) { const w = przygotuj ? przygotuj(u.linie) : u.linie.slice().reverse(); s += (w.length ? w.map(wiersz).join('') : `<div class="nota" data-lv="nota">nic w tym okresie</div>`) + `<div class="nota" data-lv="nota">${u.etyk}: ${w.length} wpisów (najnowsze na górze)</div>`; }
-  return s;
-}
+/*  [D-346] `sekcjaOkres` USUNIETA. Byla jedynym miejscem z przyciskiem „ostatnie 7 dni" i jedynym
+    ekranem okresu, ktory NIE ladowal sie sam - czyli dokladnie tym, na co Tomasz narzekal
+    („alarmy nie laduja sie same, trzeba kliknac ostatnie 24h"). Zastepuja ja `okresPaski`,
+    `okresStopka` i `okresAuto`, wspolne z dziennikiem zdarzen. */
 function sekcjaKarta(kat, wiersz, przygotuj) {
   const u = KARTA_UI[kat];
   if (!u.pliki && !u.laduje && !u.blad) kartaLista(kat);
@@ -9571,9 +9695,9 @@ function sekcjaKarta(kat, wiersz, przygotuj) {
    pamięć od startu (RAM) z notą. Ptaszki = trzy kategorie z 14b (użytkownik / automat / konfiguracja).
    ============================================================ */
 const zdKatWl = { 1: true, 2: true, 3: true };
-let zdTryb = '24h';                       /* '24h' | 'zakres' */
 function zdPrzelaczKat(k) { zdKatWl[k] = !zdKatWl[k]; srvRender(); }
-function zdWybierz(tryb) { zdTryb = tryb; if (tryb === '24h') { const u = OKRES_UI.zdarzenia; if (!u.laduje) kartaOkresOstatnie('zdarzenia', 24); } else srvRender(); }
+/*  [D-346] `zdTryb` i `zdWybierz` ZASTAPIONE przez wspolne `OKRES_TRYB.zdarzenia` i `okresWybierz` -
+    ten sam przelacznik obsluguje teraz dziennik i historie alarmow. */
 function ekrZdarzenia(){
   /*  UKŁAD 2 [Tomasz 2026-09-10 17:30]: góra ma być WĄSKA i czytelna, bo najważniejsza jest tabela pod spodem.
       Dwa wąskie paski: „Rejestr · ostatnie 24 h" i „Rejestr · od–do" (daty pokazują się po tapnięciu w pasek),
@@ -9582,30 +9706,24 @@ function ekrZdarzenia(){
   const kiedy = t => { if (!t || t < 1735689600) return '— —'; const m = new Date(t * 1000);
       return p2(m.getUTCDate()) + '.' + p2(m.getUTCMonth() + 1) + ' ' + p2(m.getUTCHours()) + ':' + p2(m.getUTCMinutes()) + ':' + p2(m.getUTCSeconds()); };
   if (window.MOST_JS && MOST_JS.prosZdarzenia) MOST_JS.prosZdarzenia();
-  if (zdTryb === '24h' && u.linie === null && !u.laduje && !u.blad) kartaOkresOstatnie('zdarzenia', 24);
+  okresAuto('zdarzenia');   /* [D-346] wspolna regula: 24 h same przy wejsciu, bez dobijania przy bledzie */
   const teraz = (SRV_S.czasSter || Math.floor(Date.now() / 1000));
   /* stopki z liczbą wpisów i źródłem NIE MA [Tomasz 2026-09-10 23:10: „tego wpisu nie generuj”] - numer w tabeli mówi, ile jest */
   let wiersze = null;
   if (u.linie && !u.blad) wiersze = u.linie.slice().reverse();
-  else if (z && z.wpisy) wiersze = z.wpisy.filter(x => zdTryb !== '24h' || x[0] >= teraz - 86400);   /* bez karty (albo karta jeszcze nie odpowiedziała): pamięć od startu - tabela nie znika na czas cichego odświeżenia [D-308] */
+  else if (z && z.wpisy) wiersze = z.wpisy.filter(x => OKRES_TRYB.zdarzenia !== '24h' || x[0] >= teraz - 86400);   /* bez karty (albo karta jeszcze nie odpowiedziała): pamięć od startu - tabela nie znika na czas cichego odświeżenia [D-308] */
   const pokaz = wiersze ? wiersze.filter(x => zdKatWl[x[1]]) : null;
-  const pasek24 = `<div class="zdpas${zdTryb === '24h' ? ' akt' : ''}" data-lv="c.zdtryb" onclick="zdWybierz('24h')"><span class="zdpas-t">Rejestr · ostatnie 24 h</span></div>`;
-  const pasekOd = `<div class="zdpas${zdTryb === 'zakres' ? ' akt' : ''}" data-lv="c.zdtryb" onclick="zdWybierz('zakres')"><span class="zdpas-t">Rejestr · od – do</span>${
-      zdTryb === 'zakres' ? `<span class="zdzakres" onclick="event.stopPropagation()"><input type="date" id="okres-od-zdarzenia" value="${u.odTxt || ''}"> – <input type="date" id="okres-do-zdarzenia" value="${u.doTxt || ''}"> <span class="abtn" data-lv="abtn" onclick="kartaOkresPola('zdarzenia')">pokaż</span></span>`
-                          : `<span class="zdpas-i">${u.odTxt && u.doTxt ? u.odTxt + ' – ' + u.doTxt : 'tapnij, podaj daty'}</span>`}</div>`;
   const ptaszek = (k, et) => `<div class="mrow zdmini ${zdKatWl[k] ? 'wl' : ''}" data-lv="p.zdkat${k}" onclick="zdPrzelaczKat(${k})"><span class="ptaszek">${PTASZEK}</span><span class="t">${et}</span></div>`;
   return `<div class="tresc">
-    ${pasek24}${pasekOd}
+    ${okresPaski('zdarzenia')}
     <div class="zdkaty">${ptaszek(1, 'Użytkownik')}${ptaszek(2, 'Zdarzenia cykliczne')}${ptaszek(3, 'Zmiany w konfiguracji')}</div>
     ${u.laduje && !pokaz ? `<div class="nota" data-lv="nota">szukam na karcie…</div>`
-      : !pokaz ? `<div class="nota" data-lv="nota">${zdTryb === 'zakres' ? 'podaj zakres i naciśnij „pokaż"' : 'czekam na dane…'}</div>`
+      : !pokaz ? `<div class="nota" data-lv="nota">${OKRES_TRYB.zdarzenia === 'zakres' ? 'podaj zakres i naciśnij „pokaż"' : 'czekam na dane…'}</div>`
       : !pokaz.length ? `<div class="nota" data-lv="nota">nic w tym okresie${Object.values(zdKatWl).every(v => v) ? '' : ' (przy tych ptaszkach)'}</div>`
       : `<div class="zdtabw"><table class="zdtab" data-lv="o"><thead><tr><th>#</th><th>czas</th><th>zdarzenie</th><th>źródło</th></tr></thead><tbody>`
         + pokaz.map((x, i) => `<tr class="k${x[1]}"><td class="nr">${i + 1}</td><td>${kiedy(x[0])}</td><td>${zdTekst(x)}</td><td>${ZD_ZRODLO[x[3]] || x[3]}</td></tr>`).join('')
         + `</tbody></table></div>`}
-    <div class="nota" data-lv="nota" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-      ${u.linie ? `<span class="abtn" data-lv="abtn" onclick="kartaOkresPobierz('zdarzenia')">pobierz CSV</span>` : ''}
-      ${!u.laduje ? `<span class="abtn" data-lv="abtn" onclick="${zdTryb === '24h' ? "kartaOkresOstatnie('zdarzenia',24)" : "kartaOkresPola('zdarzenia')"}">odśwież</span>` : `<span class="zdpas-i">odświeżam…</span>`}</div>
+    ${okresStopka('zdarzenia')}
     ${sekcjaKarta('zdarzenia', x => zdKatWl[x[1]] ? `<div class="mrow odczyt" data-lv="o"><span class="t">${zdTekst(x)}<i>${kiedy(x[0])} · ${ZD_ZRODLO[x[3]] || x[3]}</i></span></div>` : '')}
   </div>` + pasek('SERWIS · dziennik zdarzeń', 'serwis');
 }
@@ -9628,14 +9746,41 @@ function ekrHistoria(){
     /* [D-308] epizody zamiast każdego podniesienia: almSklej; wiersz = nazwa + czas PIERWSZEGO + „×n" gdy odbijał */
     const wierszAlm = e => `<div class="mrow odczyt" data-lv="o"><span class="t">${nazwa(e.bit)}<i>${kiedy(e.czas)}${e.n > 1 ? ' · ×' + e.n : ''}</i></span></div>`;
     const epizody = lin => almSklej(lin.filter(x => x[2]).map(x => ({ bit: x[1], czas: x[0] })));   /* linie CSV: czas;bit;pojawil */
-    const w = almSklej(((h && h.wpisy) ? h.wpisy : []).filter(x => x[1]).map(x => ({ bit: x[0], czas: x[2] }))).slice(0, 50);
-    return `<div class="tresc">` + (!h ? `<div class="nota" data-lv="nota">wczytywanie…</div>`
-      : !w.length ? `<div class="nota" data-lv="nota">${h.ile ? 'koniec listy' : 'brak zdarzeń od startu sterownika'}</div>`
-      : w.map(wierszAlm).join('')
-        + `<div class="nota" data-lv="nota">ostatnie ${w.length} alarmów${h.zgubione ? ' · utraconych: ' + h.zgubione : ''}</div>`)
-      + sekcjaOkres('alarmy', wierszAlm, epizody)
-      + sekcjaKarta('alarmy', wierszAlm, epizody)
-      + `</div>` + pasek('SERWIS · historia alarmów', 'serwis');
+    /*  TEN SAM UKLAD, CO DZIENNIK ZDARZEN [D-346, Tomasz 2026-09-12: „takie zrob w alarmach"]
+        ------------------------------------------------------------
+        WEJSCIA:  karta SD sterownika (`OKRES_UI.alarmy`, zadanie `/okres?kat=alarmy`) ORAZ pamiec
+                  ulotna sterownika (`SRV_S.hist`, komenda MBH przez most).
+        CO Z CZEGO WYNIKA: rozstrzyga KARTA - jesli odpowiedziala, tabela idzie z niej. Bez karty
+                  (sadzawka) albo zanim odpowie - te same wiersze z pamieci sterownika, zeby ekran
+                  nie byl pusty. Dokladnie ten sam wybor robi dziennik zdarzen [D-308].
+        WYJSCIA:  jedna tabela z numeracja od najnowszego + stopka „pobierz CSV / odswiez".
+
+        ⚠ ZRODLO JEST WIDOCZNE. Pamiec sterownika ginie przy restarcie, karta nie - i czlowiek
+        patrzacy na liste MUSI wiedziec, ktore z dwojga oglada; inaczej „nic nie ma" po restarcie
+        wyglada jak sprawna, pusta historia.
+        ⚠ EPIZODY, NIE PODNIESIENIA [D-308]: `almSklej` skleja alarm odbijajacy w jeden wiersz
+        z czasem PIERWSZEGO wystapienia i liczba powtorzen - inaczej jeden migoczacy alarm zjadal
+        cala liste. Kolumna „powt." niesie te liczbe. */
+    okresAuto('alarmy');
+    const u = OKRES_UI.alarmy;
+    const zKarty = (u.linie && !u.blad) ? epizody(u.linie) : null;
+    const zRam = almSklej(((h && h.wpisy) ? h.wpisy : []).filter(x => x[1]).map(x => ({ bit: x[0], czas: x[2] }))).slice(0, 50);
+    const w = zKarty || ((h && h.wpisy) ? zRam : null);
+    const zrodlo = zKarty ? `${u.etyk} · z karty sterownika`
+                 : `pamięć sterownika od startu (restart ją kasuje)${h && h.zgubione ? ' · utraconych: ' + h.zgubione : ''}`;
+    return `<div class="tresc">
+      ${okresPaski('alarmy')}
+      ${u.laduje && !w ? `<div class="nota" data-lv="nota">szukam na karcie…</div>`
+        : !w ? `<div class="nota" data-lv="nota">${OKRES_TRYB.alarmy === 'zakres' ? 'podaj zakres i naciśnij „pokaż"' : 'czekam na dane…'}</div>`
+        : !w.length ? `<div class="nota" data-lv="nota">nic w tym okresie</div>`
+        : `<div class="zdtabw"><table class="zdtab" data-lv="o"><thead><tr><th>#</th><th>czas</th><th>alarm</th><th>powt.</th></tr></thead><tbody>`
+          + w.map((e, i) => `<tr><td class="nr">${i + 1}</td><td>${kiedy(e.czas)}</td><td>${nazwa(e.bit)}</td><td>${e.n > 1 ? '×' + e.n : ''}</td></tr>`).join('')
+          + `</tbody></table></div>`}
+      ${w ? `<div class="nota" data-lv="nota">${zrodlo}</div>` : ''}
+      ${u.blad && !u.laduje ? `<div class="nota" data-lv="nota">karta: ${u.blad}</div>` : ''}
+      ${okresStopka('alarmy')}
+      ${sekcjaKarta('alarmy', wierszAlm, epizody)}
+    </div>` + pasek('SERWIS · historia alarmów', 'serwis');
   }
   const wpisy = [
     ['wt 18.08 06:12','E2','Płukanie przerwane / niewykonane — podpowiedź 17: brak ubytku wody, sprawdź głowicę płuczącą'],
@@ -9739,6 +9884,27 @@ function pokazOdmowe(blad){
    ⚠ Tylko przy TYM SAMYM ekranie - wejście w inny ma zaczynać się od góry,
    inaczej nowy ekran otwierałby się w połowie. */
 let SRV__przewEkran = null;
+
+/*  POWROT WRACA NA SWOJE MIEJSCE [D-344, Tomasz 2026-09-12: „po wyjsciu z funkcji poziom wyzej
+    ekran wraca do gory zamiast byc w tym samym miejscu co przed wejsciem, zwlaszcza te na dole"]
+    ------------------------------------------------------------
+    WEJSCIA:  zmiana ekranu przez `idz(ekran, kier)`; kierunek „wglab" albo „wstecz".
+    CO Z CZEGO WYNIKA: wychodzac z ekranu zapamietujemy, jak daleko byl przewiniety.
+              Wracajac NA NIEGO (kierunek „wstecz") odtwarzamy to miejsce; wchodzac w glab
+              zaczynamy od gory i zapis kasujemy.
+    WYJSCIA:  pozycja przewiniecia po przebudowie ekranu.
+
+    PO CO: lista funkcji serwisowych jest dluzsza niz ekran telefonu. Do 12.09 wejscie
+    w cokolwiek z jej DOLU i powrot znaczyly przewijanie od nowa — za kazdym razem.
+    Nikt tego nie nazywa usterka; czuc to jako niedorobienie.
+    ⚠ DLACZEGO OSOBNA PAMIEC, skoro `SRV__przewZapisz`/`SRV__przewWroc` juz sa: tamte chronia
+    przewiniecie przy PRZEBUDOWIE TEGO SAMEGO ekranu (paczka stanu przychodzi kilka razy
+    na sekunde i bez nich lista skakalaby pod palcem). Przy ZMIANIE ekranu celowo nie dzialaja —
+    przeniesienie przewiniecia z ekranu A na B byloby bledem. Tu chodzi o co innego:
+    zeby ekran pamietal SWOJE miejsce, dopoki sie na niego wraca.
+    ⚠ KASUJEMY PRZY WEJSCIU W GLAB — inaczej lista otwarta po raz drugi od gory pokazalaby
+    sie w polowie, bez powodu widocznego dla czlowieka. */
+const _przewPamiec = Object.create(null);
 function SRV__przewZapisz(root){
   const w = [];
   if (!root) return w;
@@ -9750,6 +9916,21 @@ function SRV__przewZapisz(root){
     if (sel) w.push([sel, e.scrollTop]);
   });
   return w;
+}
+/*  PRZYWROCENIE POZYCJI DWA RAZY: TERAZ I PO PIERWSZEJ KLATCE [D-344]
+    ------------------------------------------------------------
+    Na makiecie w przegladarce na PC wystarcza jedno ustawienie `scrollTop` zaraz po `innerHTML`.
+    W apce na telefonie nie zawsze: w chwili podmiany tresci przegladarka moze jeszcze nie znac
+    ostatecznej wysokosci (pismo z sieci, warstwa dekoracyjna PWA, pasek adresu chowajacy sie
+    w trakcie). Wtedy `scrollTop` zostaje PRZYCIETY do aktualnej, mniejszej wysokosci - i ekran
+    laduje wyzej, niz byl, albo na samej gorze.
+    Dlatego przy POWROCIE (nie przy zwyklym przerysowaniu) ustawiamy pozycje jeszcze raz po
+    pierwszej klatce, gdy uklad jest juz policzony.
+    ⚠ TYLKO PRZY POWROCIE. Przy zwyklym przerysowaniu paczka ze sterownika czlowiek moze wlasnie
+    przewijac palcem - ustawienie `scrollTop` klatke pozniej szarpnbyloby mu liste pod reka. */
+function _przewWrocPo(root, w){
+  SRV__przewWroc(root, w);
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => SRV__przewWroc(root, w));
 }
 function SRV__przewWroc(root, w){
   if (!root) return;
@@ -9853,6 +10034,20 @@ function srvRender(anim = true){
     scr.classList.add(SRV_S.kier);
   }
   SRV__przewWroc(scr, _zap);
+  /*  [D-344] Powrot na ekran, ktory juz odwiedzalismy: odtworz jego miejsce.
+      Wejscie w glab kasuje zapis, zeby nastepne otwarcie zaczelo sie od gory. */
+  if (SRV_S.ekran !== SRV__przewEkran) {
+    /*  ⛔ KIERUNEK POWROTU NAZYWA SIE `powrot`, NIE `wstecz` [poprawka 12.09 wieczor].
+        Pierwsza wersja tej galezi pytala o 'wstecz' - wartosc, ktorej `idz()` nigdy nie ustawia
+        (`pasek()` wola `idz(dokad,'powrot')`, a 'wstecz' to KLASA CSS strzalki w naglowku).
+        Warunek byl wiec zawsze falszywy: kazde wejscie na ekran szlo galezia `else` i KASOWALO
+        zapamietana pozycje, wiec ekran zawsze wracal na gore - dokladnie to, na co Tomasz
+        narzekal po raz drugi („i dalej w pwa po wejsciu i wyjsciu przeskakuje ekran do gory").
+        ⚠ Dwie nazwy tego samego pojecia w jednym pliku sa pulapka; jesli kiedys dojdzie trzecia,
+        wprowadzic stala, zamiast porownywac napisy w kilku miejscach. */
+    if (SRV_S.kier === 'powrot' && _przewPamiec[SRV_S.ekran]) _przewWrocPo(scr, _przewPamiec[SRV_S.ekran]);
+    else delete _przewPamiec[SRV_S.ekran];
+  }
   SRV__przewEkran = SRV_S.ekran;
   zegarHold();
 }

@@ -517,6 +517,25 @@
         nakładamy na tablice obiektu. Luka w seq → prosimy o pełny (`zadanie`). Ekrany serwisu
         czytają /rej Z LUSTRA - bez pytania sterownika. */
     const HASLA_REJ = a => (a >= 4767 && a <= 4782) || (a >= 4800 && a <= 4815) || (a >= 4875 && a <= 4890) || (a >= 4970 && a <= 4985);
+    /*  ILE WSTECZ TO JESZCZE „spóźniona kopia" [D-338 — liczba miała nazwę dopiero tutaj].
+        Mniejszy skok numeru w tył = ta sama paczka, która przyszła drugą drogą później — pomijamy.
+        Większy = restart sterownika albo przewinięcie licznika — wtedy to, co przyszło, JEST prawdą. */
+    const SEQ_SKOK_RESTART = 1000;
+    /*  PROŚBA O PEŁNY BLOK NIE CZĘŚCIEJ NIŻ CO TYLE [ms, D-338 cz. 2 — zmierzone na stanowisku].
+        Przy zalewie (20 komend na sekundę) powstawała pętla sprzężenia: luka → prośba o pełny blok
+        → blok 4,5–7 kB wchodzi do skrzynki numerowanej sterownika → opóźnia potwierdzenia
+        → więcej luk → więcej próśb. Lekarstwo musi być rzadsze niż choroba.
+        Dwie sekundy to ta sama liczba, po której zasłaniamy ekran przy nierozwiązanej luce —
+        czyli prośba zdąży wrócić, zanim człowiek cokolwiek zauważy. */
+    const PELNY_ODSTEP_MS = 2000;
+    let _pelnyOst = 0;
+    const prosPelny = (powod) => {
+        const teraz = Date.now();
+        if (teraz - _pelnyOst < PELNY_ODSTEP_MS) return false;   /* już prosiliśmy — blok jest w drodze */
+        _pelnyOst = teraz;
+        oglos('pelny');
+        return true;
+    };
     const zastosujPelny = (pref, w, txt) => {
       const mb = parsujLinie(txt, 'MB;'), mn = parsujLinie(txt, 'MN;');
       if (mb) w.mb = mb; if (mn) w.mn = mn;
@@ -793,10 +812,15 @@
     setInterval(() => { const w = wybrany && obiekty[wybrany];
       /*  [D-321] PROGI CISZY PODNIESIONE: sterownik nadaje heartbeat co 5 s (było 2 s), więc cztery
           sekundy bez paczki to teraz normalna praca, a nie kłopot. Dopytujemy po 10 s. */
-      if (brokerOgolem().stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 10000) oglosTeraz();
+      if (brokerOgolem().stan === 'ok' && w && w.kiedy && Date.now() - w.kiedy > 7000) oglosTeraz();
       /*  [D-315] cisza u niosącego (6 s) albo jego zerwanie = wpinamy ciężkie tematy z powrotem WSZĘDZIE.
           Lepiej przez chwilę odebrać dwa razy, niż nie odebrać wcale. */
-      const cisza = !w || !w.kiedy || Date.now() - w.kiedy > 12000;
+      /*  [D-332] PROG CISZY 12 s -> 8 s. Przy awarii drogi to WLASNIE ten prog wyznacza dziure
+          w obrazie, bo aplikacja prosi „nadawaj oboma" szybciej, niz sterownik zdazy zauwazyc awarie
+          (zmierzone: obraz wracal po 14,8-20,2 s, a sterownik wiedzial dopiero po 22,1 s). Heartbeat
+          idzie co 5 s, wiec 8 s to poltora heartbeatu - falszywa prosba kosztuje chwile podwojnego
+          odbioru i nic wiecej. */
+      const cisza = !w || !w.kiedy || Date.now() - w.kiedy > 8000;
       if (POL.length > 1 && (cisza || POL.some(c => c.lekki && c.stan.stan !== 'ok'))) {
         POL.forEach(c => { c.bliz = 0; wepnijCiezkie(c); });
         /*  [D-321] i mówimy o tym STEROWNIKOWI od ręki: niech znowu nadaje oboma. Bez tego czekałby
@@ -811,7 +835,7 @@
       if (w && w.luka && w.lukaOd && Date.now() - w.lukaOd > 2000) {
         w.zasiew = true; w.lukaOd = Date.now();
         zapisz('luka bez pełnego bloku - zasłaniam ekran i proszę jeszcze raz');
-        if (wybrany) oglos('pelny');
+        if (wybrany) prosPelny('zasłona');
         oddaj();
       }
     }, 1000);
@@ -887,7 +911,7 @@
               w innej kolejności (zmierzone: „luka seq 6213→6212"), a starą już mamy nałożoną. Odsiewamy każdy
               numer NIE NOWSZY od naszego - ale tylko gdy różnica jest mała; duży skok w dół to restart
               sterownika albo przewinięcie licznika i wtedy naprawdę trzeba poprosić o pełny blok. */
-          if (w.seq != null && d.seq < w.seq && w.seq - d.seq < 1000) return;
+          if (w.seq != null && d.seq < w.seq && w.seq - d.seq < SEQ_SKOK_RESTART) return;
           if (w.seq === d.seq) {
             /*  DOWÓD, ŻE TEN BROKER JEST NADMIAROWY [D-315]: przyniósł paczkę, którą już mamy. Po pięciu takich
                 z rzędu odpinamy od niego ciężkie tematy - ale tylko wtedy, gdy NIE jest tym, który niesie obiekt. */
@@ -895,7 +919,7 @@
             return;
           }
           _zrodlo.bliz = 0;
-          if (w.seq != null && d.seq !== w.seq + 1) { w.luka = true; w.lukaOd = Date.now(); if (pref === wybrany) { zapisz('luka seq ' + w.seq + '→' + d.seq); oglos('pelny'); } }   /* luka → pełny blok od ręki; do niego lustro = zasiew [chwila luki: D-318] */
+          if (w.seq != null && d.seq !== w.seq + 1) { w.luka = true; w.lukaOd = Date.now(); if (pref === wybrany) { zapisz('luka seq ' + w.seq + '→' + d.seq); prosPelny('luka'); } }   /* luka → pełny blok od ręki; do niego lustro = zasiew [chwila luki: D-318] */
           w.seq = d.seq;
         }
         if (d.t) zegar[pref] = { czas: d.t, kiedy: Date.now() };
@@ -909,6 +933,21 @@
       }
       if (rodzaj !== 'blok') return;
       const pref = cz.slice(0, -1).join('/');
+      /*  SPÓŹNIONY PEŁNY BLOK TO TEŻ NIE PRAWDA [D-338]. `zm` odsiewa spóźnione kopie od D-316,
+          a `blok` nie odsiewał nic — a bierze numer z tego samego licznika. Blok o numerze niższym
+          niż nasze lustro wołał `zastosujPelny`, które cofało `w.seq` i podmieniało mb/mn/r STARSZĄ
+          migawką: świeżo zapalone światło gasło na telefonie, a następna zmiana wyglądała jak luka
+          i wymuszała kolejną prośbę o pełny blok. Przy dwóch brokerach blok i zmiana idą obiema
+          drogami i potrafią się wyminąć w drodze, więc sam porządek po stronie sterownika nie wystarcza.
+          Duży skok w dół zostaje przyjęty — to restart sterownika albo przewinięcie licznika. */
+      {
+        const zS = parsujLinie(m.payloadString, 'Z;');
+        const wS = obiekty[pref] && obiekty[pref].seq;
+        if (zS && zS.length && wS != null && zS[0] < wS && wS - zS[0] < SEQ_SKOK_RESTART) {
+          zapisz('spóźniony pełny blok seq ' + zS[0] + ' < ' + wS + ' - pomijam, lustro nowsze');
+          return;
+        }
+      }
       obiekty[pref] = Object.assign(obiekty[pref] || {}, { kiedy: Date.now(), kl: _zrodlo });   // status z `status` zostaje; `kl` = broker, którym przyszedł [D-313]
       zastosujPelny(pref, obiekty[pref], m.payloadString);
       /*  RETAINED = ZASIEW, NIE ŚWIEŻY STAN [D-280]: blok z flagą retained ma od 0 do 60 s. Zasiewa
@@ -947,6 +986,19 @@
         [D-313] KAŻDY BROKER MA SWÓJ komplet: stan, odstęp, zegar i gniazdo siedzą w jego wpisie `c` z POL;
         wspólne są tylko lustro obiektów, dziennik i ekran. */
     const ODSTEPY = [1, 2, 5, 10, 20, 30, 60];
+    /*  GDY CZLOWIEK PATRZY, PROBUJEMY OD RAZU [D-345, Tomasz 2026-09-12: „od razu bez czekania"]
+        ------------------------------------------------------------
+        OBJAW: „na PC polaczona i widze, a na telefonie caly czas lacze ponownie" - i dalej:
+        „musze zrestartowac i dziala". To nie bylo zerwane polaczenie, tylko ZABLOKOWANE PONAWIANIE:
+        po kilku nieudanych probach odstep dochodzi do 60 s, wiec apka probuje raz na minute.
+        Restart zerowal licznik, wiec laczyla od razu - stad zludzenie, ze pomaga tylko restart.
+        Odstep zerowal sie przy POWROCIE NA EKRAN i po odmrozeniu karty, ale kto trzyma apke
+        otwarta i patrzy, ten zadnego z tych momentow nie wywoluje.
+        ⛔ ROZDZIELAMY DWIE SYTUACJE: gdy apka jest WIDOCZNA, czlowiek czeka i musi widziec proby -
+        odstep nie ma prawa urosnac ponad kilka sekund. Gdy jest w tle, nikt nie patrzy i liczy sie
+        oszczedzanie baterii oraz niedobijanie brokera - tam zostaja stare odstepy.
+        ⚠ Brokera i tak nie dobijemy: `polaczTeraz` pilnuje 1,5 s miedzy probami niezaleznie od tego. */
+    const ODSTEPY_PATRZY = [1, 2, 3, 5];
     const etyk = c => (POL.length > 1 ? 'serwer ' + c.nr + ': ' : '');
     /*  Komplet tematów obiektu; qos 1 tam, gdzie zgubiona wiadomość to zgubiona odpowiedź (paczki zmian,
         dziennik, karta SD), qos 0 tam, gdzie i tak przyjdzie następna (blok, stan, status, wynik). */
@@ -966,7 +1018,10 @@
     const zrobDriver = c => {
       c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
       const ponowPozniej = powod => {
-        const sek = ODSTEPY[Math.min(c.odstepNr, ODSTEPY.length - 1)]; c.odstepNr++;
+        /* [D-345] tablica zalezy od tego, czy ktos patrzy - patrz uzasadnienie przy ODSTEPY_PATRZY */
+        const widac = (typeof document === 'undefined') || document.visibilityState !== 'hidden';
+        const tab = widac ? ODSTEPY_PATRZY : ODSTEPY;
+        const sek = tab[Math.min(c.odstepNr, tab.length - 1)]; c.odstepNr++;
         if (c.ponowZegar) clearTimeout(c.ponowZegar);
         c.ponowZegar = setTimeout(() => { c.ponowZegar = null; c.polaczTeraz(powod); }, sek * 1000);
         return sek;
@@ -1007,7 +1062,7 @@
         if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
         c.stan = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
         zapisz(etyk(c) + (ponownie ? 'połączony ponownie' + przerwa : 'połączony'));
-        if (ponownie && wybrany && klDla(wybrany) === c) oglos('pelny');   /* w czasie przerwy paczki zmian przepadły, retained blok bywa 60 s stary [D-278] */
+        if (ponownie && wybrany && klDla(wybrany) === c) { _pelnyOst = 0; prosPelny('powrót łącza'); }   /* w czasie przerwy paczki zmian przepadły, retained blok bywa 60 s stary [D-278] */
         oddaj();
       };
       c.opcje = { useSSL: true, userName: c.user, password: c.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: false,
