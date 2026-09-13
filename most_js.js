@@ -852,7 +852,10 @@
       if (!widoczna) return;
       czekamPoPowrocie = true; oddaj();
       const doZrobienia = POL.filter(c => !c.kl.isConnected());
-      if (doZrobienia.length) { doZrobienia.forEach(c => { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('powrót na ekran'); }); oddaj(); }
+      if (doZrobienia.length) { doZrobienia.forEach(c => {
+        /* [D-354] czlowiek wrocil i czeka - jesli poprzednie proby padly, nie reanimujemy, tylko budujemy od zera */
+        if (c.stan.stan === 'blad' || c.byloZerwane) odnowKlienta(c);
+        c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('powrót na ekran'); }); oddaj(); }
       if (POL.some(c => c.kl.isConnected())) oglosTeraz();
     });
     window.addEventListener('focus', oglosTeraz);
@@ -872,7 +875,9 @@
     M._zerwij = nr => { const c = POL.find(x => x.nr === nr); if (!c || !c.gniazdo) return false;
       try { c.gniazdo.close(); zapisz('próba brzegowa: zerwano serwer ' + nr); return true; } catch (e) { return false; } };
     document.addEventListener('resume', () => { zapisz('karta odmrożona'); czekamPoPowrocie = true;
-      POL.filter(c => !c.kl.isConnected()).forEach(c => { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('odmrożenie'); }); oddaj(); });
+      POL.filter(c => !c.kl.isConnected()).forEach(c => {
+        odnowKlienta(c);   /* [D-354] karta byla zamrozona - gniazdo i sesja u brokera sa nie do odzyskania */
+        c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('odmrożenie'); }); oddaj(); });
     setInterval(() => { const w = wybrany && obiekty[wybrany];
       /*  [D-321] PROGI CISZY PODNIESIONE: sterownik nadaje heartbeat co 5 s (było 2 s), więc cztery
           sekundy bez paczki to teraz normalna praca, a nie kłopot. Dopytujemy po 10 s. */
@@ -1128,7 +1133,7 @@
       c.kl.onConnected = () => {
         const ponownie = c.byloZerwane;
         const przerwa = (ponownie && c.zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - c.zerwaneOd) / 1000) + ' s' + (c.byloWTle ? ', telefon był w tle' : '') + ')' : '';
-        c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0;
+        c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.nieudane = 0;
         if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
         c.stan = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
         zapisz(etyk(c) + (ponownie ? 'połączony ponownie' + przerwa : 'połączony'));
@@ -1147,7 +1152,44 @@
                       : 'broker nie odpowiada (brak zasięgu?)';
           const sek = ponowPozniej('nieudana próba');
           c.stan = { stan: 'blad', opis: powod + ' - ponowna próba za ' + sek + ' s' }; zapisz(etyk(c) + 'odmowa: ' + powod + ' - próba za ' + sek + ' s'); oddaj();
+          /*  [D-354] TRZY NIEUDANE PROBY POD RZAD = cos jest nie do odratowania w tym kliencie
+              (utknieta biblioteka albo sesja o tym samym identyfikatorze wciaz zywa u brokera).
+              Budujemy od zera; nastepna proba pojdzie juz nowym klientem. */
+          c.nieudane = (c.nieudane || 0) + 1;
+          if (c.nieudane >= 3) odnowKlienta(c);
         } };
+    };
+    /*  KLIENT OD ZERA, Z NOWYM IDENTYFIKATOREM [D-354, 2026-09-13]
+        ------------------------------------------------------------
+        WEJSCIA:  polaczenie `c`, ktore nie wstaje mimo kolejnych prob.
+        CO Z CZEGO WYNIKA: zamykamy gniazdo, porzucamy stary obiekt biblioteki i budujemy NOWY,
+                  z NOWO WYLOSOWANYM identyfikatorem; obsluge podpina ta sama `zrobDriver`.
+        WYJSCIA:  `c.kl` wskazuje na swiezy obiekt gotowy do `polaczTeraz`.
+
+        ⛔ PO CO, skoro `polaczTeraz` juz ponawia [objaw Tomasza 13.09: „nie mam nawet do basenu
+        dostepu, robie restart i jest basen"; w dzienniku lacza szesc prob pod rzad, kazda
+        „broker nie odpowiada", az do przeladowania strony]:
+        1. IDENTYFIKATOR BYL STALY przez cale zycie strony (losowany raz). Telefon wraca z tla,
+           a broker jeszcze trzyma STARA sesje z tym samym identyfikatorem - nowe polaczenie leci
+           w konflikt i pada. Przeladowanie strony losowalo nowy identyfikator, wiec „restart
+           pomagal, a ponawianie nie" - to ten sam mechanizm, nie przypadek.
+        2. OBIEKT BIBLIOTEKI BYL TEN SAM. Paho potrafi utknac po zerwaniu w stanie, z ktorego
+           `connect` juz nie wychodzi (znane z D-310, dlatego mamy `reconnect:false` i wlasne
+           ponawianie). Zamkniecie gniazda w locie leczy tylko czesc przypadkow.
+        ⚠ NIE ROBIMY TEGO PRZY KAZDEJ PROBIE - nowy identyfikator to dla brokera nowy klient
+        i nowa sesja; przy `cleanSession:true` kosztuje to komplet subskrypcji od nowa. Odnawiamy
+        przy POWROCIE NA EKRAN (czlowiek patrzy i czeka) oraz po serii nieudanych prob w tle. */
+    const odnowKlienta = c => {
+      try { const g = c.gniazdo; if (g && g.close) g.close(); } catch (e) {}
+      try { if (c.kl && c.kl.isConnected()) c.kl.disconnect(); } catch (e) {}
+      c.gniazdo = null; c.nieudane = 0;
+      const nowy = 'hmi-' + Math.random().toString(16).slice(2, 10) + (c.nr > 1 ? '-' + c.nr : '');
+      try { c.kl = new Klient(c.host, c.port, '/mqtt', nowy); }
+      catch (e) { zapisz(etyk(c) + 'nie udalo sie zbudowac klienta: ' + e.message); return false; }
+      zrobDriver(c);
+      c.odstepNr = 0;
+      zapisz(etyk(c) + 'klient od nowa (identyfikator ' + nowy + ')');
+      return true;
     };
     POL.forEach(zrobDriver);
     /*  ZIMNY START Z PAMIĘCI TELEFONU [D-289, C4]: ostatni pełny blok wybranego obiektu leży w localStorage.
