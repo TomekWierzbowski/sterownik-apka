@@ -713,13 +713,33 @@
       return { host: s, port: domyslny || (/emqxsl\.com$/i.test(s) ? 8084 : 8884) }; };
     const a1 = adres(o.host, o.port);
     const POL = [{ nr: 1, host: a1.host, port: a1.port, user: o.user, pass: o.pass, temat: o.temat }];
-    if (o.host2 && o.user2) { const a2 = adres(o.host2, o.port2);
+    /*  DRUGI SERWER MA SIE WYLICZYC SAM [D-350, 2026-09-13; objaw Tomasza: „sadzawka - nie widze jej…
+        ani broker ani sterownik", przy dzialajacym basenie]
+        ------------------------------------------------------------
+        WEJSCIA:  zapis logowania z pamieci telefonu: `host2`, `user2`, `pass2` (dwa ostatnie bywaja PUSTE).
+        CO Z CZEGO WYNIKA: puste pola znacza „to samo konto z dwojka na koncu i to samo haslo" - dokladnie
+                  tak, jak obiecuje podpis pod polem na ekranie logowania („pusto = ten sam z dwojka na koncu").
+        WYJSCIA:  drugie polaczenie na liscie POL - albo jego brak, gdy nie ma adresu.
+
+        ⛔ CO BYLO ZLE: warunek brzmial `o.host2 && o.user2`, a ekran logowania zapisuje `user2` PUSTE,
+        dopoki czlowiek nie wpisze go recznie. Wyliczenie „user + 2" istnialo WYLACZNIE w chwili proby
+        logowania (index.html), nie w zapisie i nie tutaj. Skutek: apka NIGDY nie tworzyla drugiego
+        polaczenia - cicho, bez zadnego komunikatu.
+        ⚠ DLACZEGO BOLALO DOPIERO TERAZ: dopoki oba sterowniki trzymaly sie brokera glownego, drugiego
+        nikt nie potrzebowal. Sadzawka stracila HiveMQ (134 nieudane proby powrotu) i przeszla na brokera
+        AWARYJNEGO - nadaje „tematy tylko serwerem 2". Droga zapasowa w sterowniku zadzialala, ale po
+        stronie apki nie bylo jej czym odebrac. Awaryjnosc, ktorej nikt nigdy nie sprawdzil na calej drodze,
+        jest warta tyle, co jej brak.
+        ⚠ Zakres tematow nadal z PIERWSZEGO konta [D-316] - patrz nizej. */
+    const _user2 = o.user2 || (o.user ? o.user + '2' : '');
+    const _pass2 = o.pass2 || o.pass;
+    if (o.host2 && _user2) { const a2 = adres(o.host2, o.port2);
       /*  ⚠ ZAKRES TEMATÓW BIERZEMY Z PIERWSZEGO KONTA, NIE Z DRUGIEGO [D-316, Tomasz 2026-09-11: konto klienta
           na EMQX nazywa się `wanna-gliczarow2`, a na HiveMQ `gliczarow-wanna`]. To ten SAM obiekt i ten sam
           prefiks tematu w sterowniku - różnią się tylko konta u dwóch dostawców. Liczenie tematu z nazwy drugiego
           konta dawało `basen/wanna/gliczarow2`, czyli nasłuch w próżni. Nazwa konta na drugim brokerze może być
           dowolna; `temat2` zostaje furtką, gdyby kiedyś prefiks naprawdę się różnił. */
-      POL.push({ nr: 2, host: a2.host, port: a2.port, user: o.user2, pass: o.pass2,
+      POL.push({ nr: 2, host: a2.host, port: a2.port, user: _user2, pass: _pass2,
                  temat: o.temat2 || o.temat }); }
     POL.forEach((c, i) => { c.kl = new Klient(c.host, c.port, '/mqtt', cid + (i ? '-' + (i + 1) : ''));
                             c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; });
