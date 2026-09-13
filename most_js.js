@@ -757,6 +757,14 @@
                  temat: o.temat2 || o.temat }); }
     POL.forEach((c, i) => { c.kl = new Klient(c.host, c.port, '/mqtt', cid + (i ? '-' + (i + 1) : ''));
                             c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; });
+    /*  ILE BROKEROW NAPRAWDE MAMY - WPROST W DZIENNIKU [D-353, 2026-09-13]
+        Wpis „start klienta ... -> host" jest JEDEN, niezaleznie od liczby brokerow (wyzej, przy `o.host`).
+        Przez to ze zrzutu ekranu nie dalo sie odczytac, czy drugi serwer w ogole powstal - a wlasnie o to
+        pytanie rozbila sie diagnostyka znikajacej sadzawki: obiekt nadawal brokerem zapasowym, a z dziennika
+        nie wynikalo, czy apka ten broker ma. Teraz kazdy broker ma wlasna linie z numerem, adresem i kontem.
+        ⚠ HASLA TU NIE MA I BYC NIE MOZE - dziennik ogląda sie na ekranie i wysyla na zrzutach. */
+    zapisz('brokerow na liscie: ' + POL.length);
+    POL.forEach(c => zapisz('  serwer ' + c.nr + ': ' + c.host + ':' + c.port + ' jako ' + (c.user || '(bez konta)')));
     const k = POL[0].kl;                    /* pierwszy broker = główny; skrót dla czytelności niżej */
     /*  KTÓRY KLIENT OBSŁUGUJE DANY OBIEKT: ten, którym przyszedł jego blok. Zanim cokolwiek przyjdzie -
         pierwszy połączony. `klGot` oddaje klienta TYLKO gdy jest połączony (inaczej komenda nie ma czym pojechać). */
