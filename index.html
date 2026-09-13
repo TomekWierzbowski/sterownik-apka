@@ -50,7 +50,7 @@
       <label for="user">Użytkownik brokera</label>
       <input type="text" id="user" autocapitalize="off" autocorrect="off" spellcheck="false">
       <p class="mala">Powstaje z nazwy: małe litery bez polskich znaków, spacje → myślnik. Możesz go poprawić —
-      broker <b>rozróżnia wielkie i małe litery</b>, więc konto „Master" trzeba wpisać dokładnie tak.</p>
+      broker <b>rozróżnia wielkie i małe litery</b>, więc nazwę konta trzeba wpisać dokładnie tak, jak ją dostałeś.</p>
       <label class="zapam" style="margin-top:10px"><input type="checkbox" id="serw"> konto serwisowe — widzę wszystkie sterowniki</label>
       <p class="mala">Zaznacz TYLKO na własnym telefonie. Konto klienta widzi jeden obiekt — ten, którego nazwę podał serwis.</p>
       <b style="display:block;margin-top:14px">Drugi serwer (zapasowy)</b>
@@ -103,7 +103,7 @@
   el('user2').value = (z && z.user2) || '';
   el('pass2').value = (z && z.pass2) || '';
   /*  [D-326] NAZWA PRZESTAJE NADPISYWAC RECZNIE WPISANEGO UZYTKOWNIKA. Konto serwisowe nazywa sie
-      „Master" z wielkiej litery, a `slug()` robi z tego „master" - broker odpowiada wtedy „brak
+      z wielkiej litery, a `slug()` robi z tego male litery - broker odpowiada wtedy „brak
       uprawnien" (sprawdzone na obu: HiveMQ i EMQX). Kto raz poprawi pole, ten wie, co robi. */
   let userRecznie = false;
   el('user').addEventListener('input', () => { userRecznie = (el('user').value.trim() !== ''); });

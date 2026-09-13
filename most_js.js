@@ -736,7 +736,7 @@
         logowania zrobiony PRZED wprowadzeniem drugiego serwera [D-314] w ogole tego pola nie ma.
         Zmierzone na telefonie Tomasza (dziennik lacza apki 04bd5b7f91): JEDNA linia „start klienta
         -> hivemq.cloud", zero drugiego polaczenia - przy sadzawce nadajacej wylacznie na EMQX
-        (sprawdzone wlasnym klientem: basen/warsztat/sadzawka, paczki status/blok/opis/awaria).
+        (sprawdzone wlasnym klientem na brokerze zapasowym: paczki status/blok/opis/awaria docieraly).
         Efekt na ekranie: „sterownik offline (broker dostal testament)" - bo apka czytala status
         ze STAREGO brokera, gdzie lezy testament sadzawki, zamiast z tego, ktorym ona nadaje.
         ⚠ ROZNICA MIEDZY „PUSTE" A „BRAK POLA" JEST TU ISTOTNA: pusty napis znaczy swiadome
@@ -749,7 +749,7 @@
     const _pass2 = o.pass2 || o.pass;
     if (_host2 && _user2) { const a2 = adres(_host2, o.port2);
       /*  ⚠ ZAKRES TEMATÓW BIERZEMY Z PIERWSZEGO KONTA, NIE Z DRUGIEGO [D-316, Tomasz 2026-09-11: konto klienta
-          na EMQX nazywa się `wanna-gliczarow2`, a na HiveMQ `gliczarow-wanna`]. To ten SAM obiekt i ten sam
+          na drugim brokerze nazywa się inaczej niż na pierwszym]. To ten SAM obiekt i ten sam
           prefiks tematu w sterowniku - różnią się tylko konta u dwóch dostawców. Liczenie tematu z nazwy drugiego
           konta dawało `basen/wanna/gliczarow2`, czyli nasłuch w próżni. Nazwa konta na drugim brokerze może być
           dowolna; `temat2` zostaje furtką, gdyby kiedyś prefiks naprawdę się różnił. */
