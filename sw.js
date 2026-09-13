@@ -2,7 +2,7 @@
    żeby HMI otwierało się od razu i bez zasięgu (dane z brokera i tak wymagają sieci -
    bez niej ekran pokazuje ostatni stan z napisem „czekam na pakiet”). Nowa wersja
    plików = nowa nazwa pamięci (WERSJA z odcisku treści) -> stare kopie znikają. */
-const WERSJA = 'basen-hmi-88efdec24a';
+const WERSJA = 'basen-hmi-82643f30b7';
 const PLIKI = ['./', './index.html', './hmi.html', './most_js.js', './paho-mqtt.min.js',
                './manifest.webmanifest', './ikona-192.png', './ikona-512.png', './ikona-maskable-512.png'];
 self.addEventListener('install', e => {
@@ -21,10 +21,31 @@ self.addEventListener('fetch', e => {
      z pamięci. Ikony/manifest/Paho zostają cache-first (nie zmieniają się, oszczędza transfer). */
   const swiezy = e.request.mode === 'navigate' || /\.(html|js|webmanifest)$/.test(u.pathname);
   if (swiezy) {
-    e.respondWith(fetch(e.request).then(odp => {
-      if (odp && odp.ok) { const kopia = odp.clone(); caches.open(WERSJA).then(c => c.put(e.request, kopia)); }
-      return odp;
-    }).catch(() => caches.match(e.request, { ignoreSearch: true })));
+    /*  ⛔ SIEC MA LIMIT CZASU [2026-09-13, Tomasz: „pwa nie startuje, staje na logo"]
+        Pierwsza wersja robila `fetch(...).catch(kopia z pamieci)`. `catch` lapie BLAD, ale NIE lapie
+        ZAWIESZENIA: gdy telefon ma zasieg, a transmisja nie idzie (slabe LTE, przeskok WiFi/LTE,
+        sprawdzanie logowania w hotspocie), `fetch` nie odrzuca przez dlugie sekundy - i apka stoi na
+        logo, MIMO ZE ma komplet plikow w pamieci. Nie ma gorszego przypadku niz aplikacja, ktora
+        nie startuje, chociaz wszystko ma.
+        Teraz siec sciga sie z licznikiem: po SIEC_LIMIT_MS oddajemy kopie z pamieci i apka rusza.
+        ⚠ Swiezosc NIE GINIE: odpowiedz z sieci, gdy w koncu przyjdzie, i tak nadpisuje kopie, wiec
+        nastepny start jest juz nowy. Przy sprawnym laczu (kilkadziesiat ms) licznik nie zdazy
+        wystrzelic i dziala dokladnie tak, jak dotad [D-289: „mam stara wersje, nie odswieza"]. */
+    const SIEC_LIMIT_MS = 2500;
+    e.respondWith(new Promise(res => {
+      let dano = false;
+      const daj = o => { if (!dano && o) { dano = true; res(o); } };
+      const zPamieci = () => caches.match(e.request, { ignoreSearch: true }).then(daj);
+      const licznik = setTimeout(zPamieci, SIEC_LIMIT_MS);
+      fetch(e.request).then(odp => {
+        clearTimeout(licznik);
+        if (odp && odp.ok) { const kopia = odp.clone(); caches.open(WERSJA).then(c => c.put(e.request, kopia)); }
+        daj(odp);
+      }).catch(() => {
+        clearTimeout(licznik);
+        zPamieci().then(() => { if (!dano) { dano = true; res(Response.error()); } });
+      });
+    }));
   } else {
     e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(r => r || fetch(e.request).then(odp => {
       if (odp && odp.ok) { const kopia = odp.clone(); caches.open(WERSJA).then(c => c.put(e.request, kopia)); }
