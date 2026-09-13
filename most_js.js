@@ -731,9 +731,23 @@
         stronie apki nie bylo jej czym odebrac. Awaryjnosc, ktorej nikt nigdy nie sprawdzil na calej drodze,
         jest warta tyle, co jej brak.
         ⚠ Zakres tematow nadal z PIERWSZEGO konta [D-316] - patrz nizej. */
+    /*  ⛔ ADRES DRUGIEGO SERWERA TEZ MA SIE WYLICZYC [D-351, 2026-09-13]
+        Poprawka D-350 dolozyla wyliczanie KONTA, ale warunek nadal wymagal `o.host2` - a zapis
+        logowania zrobiony PRZED wprowadzeniem drugiego serwera [D-314] w ogole tego pola nie ma.
+        Zmierzone na telefonie Tomasza (dziennik lacza apki 04bd5b7f91): JEDNA linia „start klienta
+        -> hivemq.cloud", zero drugiego polaczenia - przy sadzawce nadajacej wylacznie na EMQX
+        (sprawdzone wlasnym klientem: basen/warsztat/sadzawka, paczki status/blok/opis/awaria).
+        Efekt na ekranie: „sterownik offline (broker dostal testament)" - bo apka czytala status
+        ze STAREGO brokera, gdzie lezy testament sadzawki, zamiast z tego, ktorym ona nadaje.
+        ⚠ ROZNICA MIEDZY „PUSTE" A „BRAK POLA" JEST TU ISTOTNA: pusty napis znaczy swiadome
+        „tylko pierwszy serwer" (tak mowi podpis na ekranie logowania) i to szanujemy; BRAK pola
+        znaczy tylko tyle, ze zapis jest stary - wtedy wstawiamy adres wbudowany, ten sam, ktory
+        podpowiada ekran logowania. */
+    const HOST2_WBUDOWANY = 'i15560b1.ala.us-east-1.emqxsl.com';
+    const _host2 = (o.host2 !== undefined && o.host2 !== null) ? o.host2 : HOST2_WBUDOWANY;
     const _user2 = o.user2 || (o.user ? o.user + '2' : '');
     const _pass2 = o.pass2 || o.pass;
-    if (o.host2 && _user2) { const a2 = adres(o.host2, o.port2);
+    if (_host2 && _user2) { const a2 = adres(_host2, o.port2);
       /*  ⚠ ZAKRES TEMATÓW BIERZEMY Z PIERWSZEGO KONTA, NIE Z DRUGIEGO [D-316, Tomasz 2026-09-11: konto klienta
           na EMQX nazywa się `wanna-gliczarow2`, a na HiveMQ `gliczarow-wanna`]. To ten SAM obiekt i ten sam
           prefiks tematu w sterowniku - różnią się tylko konta u dwóch dostawców. Liczenie tematu z nazwy drugiego
