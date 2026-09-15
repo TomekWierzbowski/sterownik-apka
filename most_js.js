@@ -485,6 +485,9 @@
     const zakresZ = (uzyt, serwis) => { const u = String(uzyt || ''); const i = u.indexOf('-');
       const serw = (serwis === undefined || serwis === null) ? (i <= 0) : !!serwis;
       return serw ? 'basen/+/+' : (i > 0 ? 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1) : 'basen/' + u + '/+'); };
+    const serwisowe = (o.serwis === undefined || o.serwis === null)
+                      ? (String(o.user || '').indexOf('-') <= 0)   /* stary zapis: login bez myslnika = serwisowy */
+                      : !!o.serwis;
     if (!o.temat) { o.temat = zakresZ(o.user, o.serwis);
       if (o.temat.indexOf('+') < 0 && !o.obiekt) o.obiekt = o.temat; }
     M.zakres = o.temat;   /* [D-312] widoczne dla sond i diagnostyki: co to konto ogląda */
@@ -677,6 +680,11 @@
       /* [D-314] podglad dla sond i diagnostyki: kto niesie wybrany obiekt i w jakim stanie sa brokery */
       M.ostBrokery = POL.map(c => ({ nr: c.nr, host: c.host, stan: c.stan.stan, opis: c.stan.opis, niesie: klDla(wybrany) === c }));
       return ({ obiekty: Object.keys(obiekty), obiekt: wybrany, broker: broker,
+                             /*  [D-366] KTO PATRZY: konto serwisowe czy klient. Apka chowa przed klientem
+                                 dziennik lacza, czasy i liste serwerow - jemu ma wystarczyc „sterownik jest,
+                                 broker jest". Zrodlo to ten sam ptaszek z logowania, ktory wyznacza zakres
+                                 tematow [D-312], wiec nie ma drugiej prawdy o tym, kim jest patrzacy. */
+                             serwis: !!serwisowe,
                              brokery: POL.map(c => ({ nr: c.nr, host: c.host, user: c.user, temat: c.temat, stan: c.stan.stan, opis: c.stan.opis, niesie: klDla(wybrany) === c })),
                              wydawcy: wydawcy(), ost: ost, dziennik: M.dziennik, wersja: window.APKA_WERSJA || '',
                              lacze: czekamPoPowrocie || broker.stan !== 'ok',

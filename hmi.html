@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'fcb3d10bfa';
+window.APKA_WERSJA = '0f1d44585d';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-15 23:07';
+window.HMI_ZBUDOWANO = '2026-09-15 23:51';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5835,9 +5835,9 @@ window.HMI_ZBUDOWANO = '2026-09-15 23:07';
               + '</div>'
               + '<div id="ust-brokery" hidden><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
                 + '<div id="ust-brokery-l"></div></div>'
-              + '<div><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
+              + '<div id="ust-czasy"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
                 + '<span id="chmura-w" style="font-size:12px;color:#98a0ad"></span></div>'
-              + '<div style="display:flex;flex-direction:column;min-height:0"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
+              + '<div id="ust-dziennik" style="display:flex;flex-direction:column;min-height:0"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
                 + '<pre id="chmura-dz" style="margin:0;max-height:46vh;overflow:auto;font:11px/1.4 ui-monospace,monospace;color:#d0d4da;white-space:pre-wrap;background:#0f1114;border-radius:6px;padding:8px"></pre></div>'
             + '</div>';
           document.body.appendChild(u);
@@ -5923,10 +5923,26 @@ window.HMI_ZBUDOWANO = '2026-09-15 23:07';
         const ust = document.getElementById('ust-st'); if (ust) ust.innerHTML = stHtml;
         /*  LISTA SERWERÓW [D-313]: pokazujemy ją dopiero, gdy są dwa - przy jednym wystarczy kropka „broker" wyżej.
             „niesie" = tym serwerem przychodzi wybrany obiekt, czyli tam jadą komendy. */
+        /*  DWA WIDOKI USTAWIEN [D-366, Tomasz 2026-09-15: „zwykly uzytkownik widzi to, co zaznaczylem
+            ze zrzutu; Master tak jak do tej pory"]
+            ------------------------------------------------------------
+            WEJSCIA:  `d.serwis` z paczki stanu - ten sam ptaszek z logowania, ktory wyznacza zakres tematow.
+            CO Z CZEGO WYNIKA: klientowi zostaje sama sekcja POLACZENIE (sterownik, brokery, obiekt,
+                      przycisk „Zmien sterownik / haslo"). Czasy, dziennik lacza i lista serwerow znikaja.
+            WYJSCIA:  `hidden` na trzech sekcjach.
+            PO CO: klient ma wiedziec, czy dziala - a nie czytac „pelny blok 16 s" i „retained blok
+            warsztat/basen 2995 B seq 2153". Te liczby sa dla serwisu i tylko jemu cos mowia.
+            ⚠ To NIE jest zabezpieczenie - dziennik lezy w pamieci przegladarki i kto umie, ten go
+            znajdzie. To jest porzadek na ekranie. Zabezpieczenia sa po stronie brokera (ACL) i PIN-u. */
+        const serwisowy = !!d.serwis;
+        const schowaj = (id, ukryj) => { const e = document.getElementById(id); if (e) e.hidden = ukryj; };
+        schowaj('ust-czasy', !serwisowy);
+        schowaj('ust-dziennik', !serwisowy);
+
         const ubl = document.getElementById('ust-brokery'), ublL = document.getElementById('ust-brokery-l');
         if (ubl && ublL) {
           const br = d.brokery || [];
-          ubl.hidden = br.length < 2;
+          ubl.hidden = br.length < 2 || !serwisowy;
           if (br.length >= 2) {
             const html = br.map(x => '<div style="margin-bottom:6px">'
               + '<span style="color:' + (x.stan === 'ok' ? KOL.ok : x.stan === 'laczy' ? KOL.czekam : KOL.zle) + '">&#9679;</span> '
