@@ -1134,6 +1134,7 @@
         const ponownie = c.byloZerwane;
         const przerwa = (ponownie && c.zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - c.zerwaneOd) / 1000) + ' s' + (c.byloWTle ? ', telefon był w tle' : '') + ')' : '';
         c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.nieudane = 0;
+        c.ostOdbior = Date.now();        /* [D-355] swiezo polaczony - strażnik ciszy liczy od teraz */
         if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
         c.stan = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
         zapisz(etyk(c) + (ponownie ? 'połączony ponownie' + przerwa : 'połączony'));
@@ -1254,7 +1255,52 @@
       }
       _onMsg(m);
     };
-    POL.forEach(c => { c.kl.onMessageArrived = m => { _zrodlo = c; _obsluga(m); }; });
+    POL.forEach(c => { c.kl.onMessageArrived = m => { _zrodlo = c; c.ostOdbior = Date.now(); _obsluga(m); }; });
+
+    /*  STRAZNIK CISZY - MARTWE GNIAZDO UDAJE POLACZENIE [D-355, 2026-09-13]
+        ------------------------------------------------------------
+        WEJSCIA:  czas ostatniej paczki z kazdego brokera (`c.ostOdbior`), stan biblioteki.
+        CO Z CZEGO WYNIKA: gdy biblioteka TWIERDZI, ze jest polaczona, a od brokera nie przyszlo nic
+                  przez STRAZNIK_CISZY_MS - uznajemy lacze za martwe i budujemy klienta OD ZERA.
+        WYJSCIA:  wpis w dzienniku + nowe polaczenie.
+
+        ⛔ PO CO, skoro mamy juz ponawianie [Tomasz 13.09: „apka laczy sie ok, ale podczas pracy jak
+        straci internet, juz sie ponownie nie polaczy - trzeba PWA restartowac i laczy sie od razu";
+        na ekranie stalo „sterownik online, ale ostatni pakiet 312 s temu"]:
+        `polaczTeraz` zaczyna sie od `if (!c.kl || c.kl.isConnected()) return;`. Gdy telefon traci
+        internet, gniazdo TCP NIE ZAMYKA SIE od razu - biblioteka dalej uwaza, ze jest polaczona,
+        `onConnectionLost` nie przychodzi, wiec CALE ponawianie jest wylaczone. Apka wie, ze od pieciu
+        minut nic nie dostala (pokazuje to na ekranie!), i nie robi z ta wiedza nic.
+        ⚠ PROG MUSI BYC WIEKSZY NIZ KEEPALIVE (30 s), zeby nie zrywac lacza, ktore po prostu milczy,
+        bo nikt nie prosi o ciezkie tematy. Liczymy KAZDA paczke, takze lekka - przy zywym brokerze
+        cisza dluzsza niz minuta nie zdarza sie nawet wtedy, gdy sterownik nie nadaje: idzie keepalive
+        i odpowiedzi na subskrypcje.
+        ⚠ Strażnik chodzi tylko wtedy, gdy KARTA JEST WIDOCZNA - w tle przegladarka i tak dlawi
+        liczniki, a telefon w kieszeni nie musi trzymac lacza. */
+    const STRAZNIK_CISZY_MS = 75000;
+    setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      const teraz = Date.now();
+      POL.forEach(c => {
+        if (!c.kl || !c.kl.isConnected()) return;
+        if (!c.ostOdbior) { c.ostOdbior = teraz; return; }
+        if (teraz - c.ostOdbior < STRAZNIK_CISZY_MS) return;
+        zapisz(etyk(c) + 'cisza ' + Math.round((teraz - c.ostOdbior) / 1000) + ' s mimo „połączony" - łącze martwe');
+        if (odnowKlienta(c)) { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.polaczTeraz('martwe łącze'); oddaj(); }
+      });
+    }, 15000);
+
+    /*  POWROT SIECI - PROBUJEMY OD RAZU [D-355]
+        Przegladarka mowi wprost, kiedy sieć wraca. Bez tego apka czekala na swoj odstep, a po serii
+        nieudanych prob potrafil on urosnac - czlowiek patrzy na „laczę ponownie…", chociaz internet
+        jest juz od kilkunastu sekund. */
+    window.addEventListener('online', () => {
+      zapisz('sieć wróciła - próbuję od razu');
+      POL.filter(c => !c.kl.isConnected()).forEach(c => {
+        c.odstepNr = 0; c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.polaczTeraz('powrót sieci'); });
+      oddaj();
+    });
+    window.addEventListener('offline', () => zapisz('telefon zgłasza brak sieci'));
   };
 
   window.MOST_JS = M;
