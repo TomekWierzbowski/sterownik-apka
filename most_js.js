@@ -1306,14 +1306,22 @@
       const teraz = Date.now();
       POL.forEach(c => {
         if (!c.kl || !c.kl.isConnected()) return;
-        /*  ⛔ CISZA NA DRODZE ZAPASOWEJ JEST NORMALNA [D-359, audyt Astry 15.09]: `ostOdbior` rosnie
-            WYLACZNIE od wiadomosci z tematow, a odpowiedzi protokolu (PINGRESP, SUBACK) go nie ruszaja -
-            sprawdzone na samej bibliotece. Sterownik kieruje ciezkie tematy JEDNA droga [D-315], wiec
-            drugi broker bywa zywy i cichy godzinami. Pierwsza wersja straznika zrywala go po 75 s -
-            i przez blad wyzej zostawiala gluchego klienta. Pytamy wiec tylko o droge, ktora MA co
-            przynosic: niosaca obiekt albo taka, ktora ma wpiete ciezkie tematy. */
-        const niesie = (klDla(wybrany) === c) || !c.lekki;
-        if (!niesie) { c.ostOdbior = teraz; return; }
+        /*  ⛔ CISZA NIE ZAWSZE ZNACZY AWARIE [D-359 -> D-363, dwa audyty Astry].
+            `ostOdbior` rosnie WYLACZNIE od wiadomosci z tematow; PINGRESP i SUBACK go nie ruszaja -
+            sprawdzone na samej bibliotece. Sa wiec trzy powody ciszy, przy ktorych lacze jest ZDROWE:
+              1. sterownik jest WYLACZONY albo offline - wtedy nikt nic nie nadaje zadna droga;
+              2. sterownik kieruje ciezkie tematy JEDNA droga [D-315] - druga milczy z zalozenia;
+              3. dopiero co sie polaczylismy - nie zdazylo przyjsc nic.
+            ⛔ PIERWSZA WERSJA PYTALA O `c.lekki` i to bylo zle [audyt Astry 15.09]: `lekki` staje sie
+            falszem po KAZDYM polaczeniu (onSuccess), a prawda dopiero po pieciu duplikatach - wiec
+            cicha rezerwa, ktora duplikatow nigdy nie zbierze, byla uznawana za „niosaca" i zrywana.
+            Pytamy teraz o to, CO SAMI ZAMOWILISMY: `niesieOst` to ostatnie zadanie wyslane do
+            sterownika - 0 znaczy „nadawaj oboma" (wiec obie drogi maja co przynosic), a numer znaczy
+            „nadawaj tym jednym". Do tego sprawdzamy, czy sterownik w ogole jest online. */
+        const ob = wybrany && obiekty[wybrany];
+        const sterownik_zywy = !!ob && ob.status !== 'offline';
+        const ma_przynosic = (klDla(wybrany) === c) || (niesieOst === 0);
+        if (!sterownik_zywy || !ma_przynosic) { c.ostOdbior = teraz; return; }
         if (!c.ostOdbior) { c.ostOdbior = teraz; return; }
         if (teraz - c.ostOdbior < STRAZNIK_CISZY_MS) return;
         zapisz(etyk(c) + 'cisza ' + Math.round((teraz - c.ostOdbior) / 1000) + ' s, choć połączenie zgłasza gotowość - dane nieaktualne, buduję klienta od nowa');
