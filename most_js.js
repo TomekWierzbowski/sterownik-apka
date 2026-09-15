@@ -1104,7 +1104,20 @@
       c.polaczTeraz = powod => {
         if (!c.kl || c.kl.isConnected()) return;
         /* ⚠ nie dobijamy brokera: seria zdarzeń (powrót + odmrożenie + zerwanie w tej samej chwili) ma dać JEDNĄ próbę */
-        const teraz = Date.now(); if (teraz - c.ostProba < 1500) return; c.ostProba = teraz;
+        /*  ⛔ ODRZUCONA PROBA MUSI ZOSTAWIC ZAPLANOWANA KOLEJNA [D-359, audyt Astry 15.09]:
+            pierwsza wersja robila samo `return`. Gdy blad wracal szybciej niz 1,5 s (np. odmowa gniazda
+            po 100 ms), zaplanowane ponowienie trafialo w ogranicznik i GINELO - bez zegara, bez sladu.
+            Zmierzone przez Astre: po 60 s jedna proba i zero zaplanowanych, mimo napisu „proba za 1 s".
+            Teraz odraczamy do najblizszego dozwolonego terminu zamiast porzucac. */
+        const teraz = Date.now();
+        if (teraz - c.ostProba < 1500) {
+            if (!c.ponowZegar) {
+              const za = 1500 - (teraz - c.ostProba);
+              c.ponowZegar = setTimeout(() => { c.ponowZegar = null; c.polaczTeraz(powod); }, za);
+            }
+            return;
+        }
+        c.ostProba = teraz;
         if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
         const sprobuj = () => { c.kl.connect(c.opcje); c.gniazdo = M._gniazdo; c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; oddaj(); };
         try { sprobuj(); return; }
@@ -1188,6 +1201,7 @@
       try { c.kl = new Klient(c.host, c.port, '/mqtt', nowy); }
       catch (e) { zapisz(etyk(c) + 'nie udalo sie zbudowac klienta: ' + e.message); return false; }
       zrobDriver(c);
+      podepnijOdbior(c);        /* [D-359] bez tego nowy klient jest „polaczony", ale gluchy */
       c.odstepNr = 0;
       zapisz(etyk(c) + 'klient od nowa (identyfikator ' + nowy + ')');
       return true;
@@ -1255,7 +1269,16 @@
       }
       _onMsg(m);
     };
-    POL.forEach(c => { c.kl.onMessageArrived = m => { _zrodlo = c; c.ostOdbior = Date.now(); _obsluga(m); }; });
+/*  OBSLUGA ODEBRANEJ WIADOMOSCI - JEDNO MIEJSCE, TAKZE PO ODNOWIENIU KLIENTA [D-359, audyt Astry 15.09]
+    ------------------------------------------------------------
+    ⛔ CO BYLO ZLE: `odnowKlienta` (D-354) budowal nowy obiekt biblioteki i wolal `zrobDriver`, ktora
+    podpina `onConnectionLost`, `onConnected` i opcje - ALE NIE `onMessageArrived`. Ten byl przypisywany
+    RAZ, przy starcie strony, na obiektach z pierwszej listy. Skutek: po kazdym odnowieniu klient melduje
+    „polaczony", wykonuje komplet subskrypcji, a ZADNA wiadomosc nie dociera do aplikacji - ekran zostaje
+    na ostatnim stanie i nic tego nie zglasza. Poprawka D-354 psula wiec to, co miala naprawic.
+    ⚠ Dlatego podpiecie ma jedna nazwe i jest wolane w OBU drogach: przy starcie i w `odnowKlienta`. */
+    const podepnijOdbior = c => { c.kl.onMessageArrived = m => { _zrodlo = c; c.ostOdbior = Date.now(); _obsluga(m); }; };
+    POL.forEach(podepnijOdbior);
 
     /*  STRAZNIK CISZY - MARTWE GNIAZDO UDAJE POLACZENIE [D-355, 2026-09-13]
         ------------------------------------------------------------
@@ -1283,9 +1306,17 @@
       const teraz = Date.now();
       POL.forEach(c => {
         if (!c.kl || !c.kl.isConnected()) return;
+        /*  ⛔ CISZA NA DRODZE ZAPASOWEJ JEST NORMALNA [D-359, audyt Astry 15.09]: `ostOdbior` rosnie
+            WYLACZNIE od wiadomosci z tematow, a odpowiedzi protokolu (PINGRESP, SUBACK) go nie ruszaja -
+            sprawdzone na samej bibliotece. Sterownik kieruje ciezkie tematy JEDNA droga [D-315], wiec
+            drugi broker bywa zywy i cichy godzinami. Pierwsza wersja straznika zrywala go po 75 s -
+            i przez blad wyzej zostawiala gluchego klienta. Pytamy wiec tylko o droge, ktora MA co
+            przynosic: niosaca obiekt albo taka, ktora ma wpiete ciezkie tematy. */
+        const niesie = (klDla(wybrany) === c) || !c.lekki;
+        if (!niesie) { c.ostOdbior = teraz; return; }
         if (!c.ostOdbior) { c.ostOdbior = teraz; return; }
         if (teraz - c.ostOdbior < STRAZNIK_CISZY_MS) return;
-        zapisz(etyk(c) + 'cisza ' + Math.round((teraz - c.ostOdbior) / 1000) + ' s mimo „połączony" - łącze martwe');
+        zapisz(etyk(c) + 'cisza ' + Math.round((teraz - c.ostOdbior) / 1000) + ' s, choć połączenie zgłasza gotowość - dane nieaktualne, buduję klienta od nowa');
         if (odnowKlienta(c)) { c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.polaczTeraz('martwe łącze'); oddaj(); }
       });
     }, 15000);
