@@ -747,12 +747,20 @@
         (sprawdzone wlasnym klientem na brokerze zapasowym: paczki status/blok/opis/awaria docieraly).
         Efekt na ekranie: „sterownik offline (broker dostal testament)" - bo apka czytala status
         ze STAREGO brokera, gdzie lezy testament sadzawki, zamiast z tego, ktorym ona nadaje.
-        ⚠ ROZNICA MIEDZY „PUSTE" A „BRAK POLA" JEST TU ISTOTNA: pusty napis znaczy swiadome
-        „tylko pierwszy serwer" (tak mowi podpis na ekranie logowania) i to szanujemy; BRAK pola
-        znaczy tylko tyle, ze zapis jest stary - wtedy wstawiamy adres wbudowany, ten sam, ktory
-        podpowiada ekran logowania. */
+        ⚠ SPROSTOWANIE [D-373, 2026-09-16]: do 16.09 pusty napis w `host2` znaczyl tu „swiadomy wybor
+        jednego serwera" i byl szanowany. TO ROZROZNIENIE BYLO FALSZYWE. Miedzy D-313 (11.09 09:05)
+        a D-317 (11.09 11:50) formularz logowania zapisywal `host2: ''`, bo pole „Serwer 2" bylo
+        wtedy domyslnie PUSTE - wiec kazdy zapis z tego okna WYGLADA na swiadomy wybor, a nim nie jest.
+        Telefon Tomasza mial dokladnie taki zapis: po zdjeciu sterownikow z HiveMQ (D-369) przestal je
+        widziec, a PC (zapis pozniejszy) widzial dalej.
+        ⚠ CZEMU APKA SAMA SIE NIE URATOWALA: HiveMQ ZYJE i wpuszcza - nie ma na nim tylko zadnego
+        sterownika. Zadna galaz awaryjna (zerwanie lacza, straznik ciszy, powrot sieci) nie patrzy na
+        „broker odpowiada, ale jest pusty", wiec apka siedziala na zywym, pustym brokerze bez slowa.
+        TERAZ: pusty napis znaczy to samo co brak pola - wstawiamy adres wbudowany. Kto naprawde chce
+        jednego serwera, po prostu nie dostanie na drugim konta: proba konczy sie odmowa CONNACK,
+        pierwszy broker dziala dalej, a w dzienniku lacza widac dlaczego. To jest tansze niz cisza. */
     const HOST2_WBUDOWANY = 'i15560b1.ala.us-east-1.emqxsl.com';
-    const _host2 = (o.host2 !== undefined && o.host2 !== null) ? o.host2 : HOST2_WBUDOWANY;
+    const _host2 = (o.host2 !== undefined && o.host2 !== null && o.host2 !== '') ? o.host2 : HOST2_WBUDOWANY;
     const _user2 = o.user2 || (o.user ? o.user + '2' : '');
     const _pass2 = o.pass2 || o.pass;
     if (_host2 && _user2) { const a2 = adres(_host2, o.port2);
