@@ -54,18 +54,18 @@
       <label class="zapam" style="margin-top:10px"><input type="checkbox" id="serw"> konto serwisowe — widzę wszystkie sterowniki</label>
       <p class="mala">Zaznacz TYLKO na własnym telefonie. Konto klienta widzi jeden obiekt — ten, którego nazwę podał serwis.</p>
       <b style="display:block;margin-top:14px">Serwery zapasowe</b>
-      <p class="mala">Zwykle <b>puste — i tak ma być</b>. Sterownik sam wybiera jeden serwer zapasowy spośród
-        wpisanych mu w menu serwisowym; aplikacja nie zgaduje adresów. Wypełnij tylko wtedy, gdy serwis
-        podał Ci gotowe dane — wpisanie adresu, na którym nie masz konta, pogarsza działanie.</p>
+      <p class="mala">Zostaw <b>puste — i tak ma być</b>. Po pierwszym połączeniu aplikacja <b>sama pobiera
+        adresy zapasowe ze sterownika</b> i zapamiętuje je na tym telefonie; wpisujesz tylko wtedy, gdy serwis
+        podał Ci inne dane. Aplikacja nie zgaduje adresów — pyta sterownik.</p>
       <label for="host2">Zapas 1</label>
-      <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = bez rezerwy">
+      <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = pobiorę ze sterownika">
       <p class="mala">Port dopisuje się po dwukropku, gdy jest inny niż zwykle: HiveMQ 8884, EMQX 8084 (dobieramy sam).</p>
       <label for="user2">Użytkownik zapasu 1</label>
       <input type="text" id="user2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = ten sam z dwójką na końcu">
       <label for="pass2">Hasło zapasu 1</label>
       <input type="password" id="pass2" autocomplete="off" placeholder="pusto = to samo hasło">
       <label for="host3">Zapas 2</label>
-      <input type="text" id="host3" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = bez drugiej rezerwy">
+      <input type="text" id="host3" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = pobiorę ze sterownika">
       <label for="user3">Użytkownik zapasu 2</label>
       <input type="text" id="user3" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = ten sam z trójką na końcu">
       <label for="pass3">Hasło zapasu 2</label>

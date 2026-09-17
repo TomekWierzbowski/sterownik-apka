@@ -846,11 +846,21 @@
         obiekt, wie tylko apka - z tego, którym połączeniem paczki naprawdę przychodzą (`w.kl`).
         Mówimy to przy każdym odnowieniu żądania: `1000;niesie=1`. Zero = „nadawaj oboma" i tak samo
         rozumie to starszy sterownik, który tego dopisku w ogóle nie zna (czyta samą liczbę). */
+    /*  ⛔ NUMER MUSI BYC Z JEZYKA STEROWNIKA, NIE Z NASZEGO [D-411, zmierzone 17.09 sonda
+        `_sonda_pwa_spis`]. Apka numeruje polaczenia po swojemu (1 = pierwsze na liscie), a sterownik
+        czyta `niesie=N` jako SWOJ slot N. W wariancie A te numery sie rozjechaly: nasz broker jest
+        u sterownika slotem 2, wiec „niesie=1" kierowalo ciezkie tematy na brokera, ktorego apka
+        w ogole nie sluchala. Objaw: obraz zywy, ale rwacy sie co kilka sekund - apka po 8 s ciszy
+        prosila „nadawaj oboma", dostawala dane, znowu wskazywala „serwer 1" i tak w kolko.
+        Teraz kazde polaczenie wie, ktorym slotem sterownika jest (`c.slot` z tematu `serwery`,
+        pole `ja` - przychodzi TA SAMA droga, ktorej dotyczy, wiec nazwy adresow nie musza pasowac).
+        ⚠ STEROWNIK BEZ TEGO POLA (starsze wgranie) daje `slot` pusty - wtedy 0, czyli „nadawaj
+        oboma". Podwojny ruch zamiast rwacego obrazu; naprawia sie samo po wgraniu firmware. */
     const niesieNr = () => {
       if (POL.length < 2) return 0;
       const w = wybrany && obiekty[wybrany];
       const c = w && w.kl;
-      return (c && c.kl && c.kl.isConnected() && c.stan.stan === 'ok') ? c.nr : 0;
+      return (c && c.kl && c.kl.isConnected() && c.stan.stan === 'ok') ? (c.slot || 0) : 0;
     };
     let niesieOst = -1;
     const oglos = (v, niesie) => { if (!wybrany) return;
@@ -972,6 +982,7 @@
         try { const s = JSON.parse(m.payloadString); if (s && s.czas) zegar[cz.slice(0, -1).join('/')] = { czas: s.czas, kiedy: Date.now() }; } catch (e) {}
         return;
       }
+      if (rodzaj === 'serwery') { spisSerwerow(m.payloadString); return; }   /* [D-411] */
       if (rodzaj === 'pliki') {                     /* lista plików z karty [D-297]: "#kat\nnazwa;rozmiar\n..." albo "!brak karty" */
         if (!czekaPliki) return; const c = czekaPliki; czekaPliki = null; clearTimeout(c.t);
         const l = m.payloadString.split('\n').filter(x => x.trim()); const brak = l.some(x => x[0] === '!');
@@ -1135,7 +1146,8 @@
     /*  Komplet tematów obiektu; qos 1 tam, gdzie zgubiona wiadomość to zgubiona odpowiedź (paczki zmian,
         dziennik, karta SD), qos 0 tam, gdzie i tak przyjdzie następna (blok, stan, status, wynik). */
     const TEMATY = [['blok', 0], ['zm', 1], ['status', 0], ['wynik', 0], ['stan', 0],
-                    ['zdarzenia', 1], ['zd', 1], ['pliki', 1], ['plik', 1], ['okres', 1]];
+                    ['zdarzenia', 1], ['zd', 1], ['pliki', 1], ['plik', 1], ['okres', 1],
+                    ['serwery', 0]];   /* [D-411] spis brokerow prosto ze sterownika - retained, przyjdzie od razu */
     /*  CIĘŻKIE I LEKKIE [D-315]: sterownik nadaje każdą paczkę na WSZYSTKIE podłączone brokery (zmierzone:
         zgłoszenie na jednym włącza strumień na obu), więc przy dwóch brokerach telefon odbierał wszystko dwa razy.
         `zm` i `blok` to praktycznie cały ruch - te zostają tylko na brokerze, który NIESIE obiekt. Lekkie
@@ -1387,6 +1399,97 @@
     ⚠ Dlatego podpiecie ma jedna nazwe i jest wolane w OBU drogach: przy starcie i w `odnowKlienta`. */
     const podepnijOdbior = c => { c.kl.onMessageArrived = m => { _zrodlo = c; c.ostOdbior = Date.now(); _obsluga(m); }; };
     POL.forEach(podepnijOdbior);
+
+    /*  ZAPASY BIERZEMY ZE STEROWNIKA, NIE ZGADUJEMY  [D-411, Tomasz 2026-09-17: „można w apce dać
+        zapasowy, żeby kopiował się to, co ma w sterowniku 1 do 1"]
+        ------------------------------------------------------------
+        WEJSCIA:  retained temat `<prefiks>/serwery` - sterownik wypisuje, czym nadaje i co trzyma
+                  w rezerwie (adresy, bez kont i bez hasel).
+        CO Z CZEGO WYNIKA: pusty „Zapas 1" w ustawieniach przestaje znaczyc „nie masz rezerwy" -
+                  znaczy „jeszcze nie wiem, zapytam sterownika". Po pierwszym polaczeniu apka zna
+                  adresy i zapisuje je na nastepny raz.
+        WYJSCIA:  nowe polaczenie na liscie POL + zapis w pamieci telefonu (`odbior_mqtt`).
+
+        ⚠ TO JEST ZAMKNIECIE SPRAWY Z D-373/D-410. Adres wbudowany w kod apki byl zly (burza ponowien
+          na cudzym brokerze), pusty bez slowa tez byl zly (cisza na zywym, ale pustym brokerze).
+          Zrodlem prawdy jest ten, kto naprawde wie: STEROWNIK. Apka pyta, a nie zgaduje.
+
+        ⚠ PORTU NIE PRZEPISUJEMY. Sterownik lapie sie natywnym MQTT (8883), przegladarka WebSocketem
+          po TLS (HiveMQ 8884, EMQX 8084) - ta sama nazwa, inna liczba. Bierzemy stad SAM ADRES,
+          a port dobiera `adres()` po dostawcy. Przepisanie 1:1 dalo by pukanie w gluchy port.
+
+        ⚠ DZIALAJACEGO NIE ZRYWAMY. Gdy sterownik poda inny adres, a nasze polaczenie o tym numerze
+          wlasnie dziala - zapisujemy na nastepne uruchomienie i mowimy o tym w dzienniku. Podmiana
+          w locie dotyczy tylko polaczen, ktore i tak nie stoja. */
+    const zapiszUstawienie = (pole, wart) => {
+      try { const z = JSON.parse(localStorage.getItem('odbior_mqtt') || 'null');
+            if (!z || z[pole] === wart) return false;
+            z[pole] = wart; localStorage.setItem('odbior_mqtt', JSON.stringify(z)); return true;
+      } catch (e) { return false; }   /* logowanie bez „zapamietaj" - polaczymy sie mimo to, tylko na ten raz */
+    };
+    const dodajSerwer = (nr, host, powod) => {
+      const a = adres(host);
+      const user = nr === 2 ? (o.user2 || (o.user ? o.user + '2' : ''))
+                            : (o.user3 || (o.user ? o.user + '3' : ''));
+      if (!a.host || !user) return;
+      const c = { nr, host: a.host, port: a.port, user,
+                  pass: (nr === 2 ? (o.pass2 || o.pass) : (o.pass3 || o.pass)),
+                  temat: (nr === 2 ? (o.temat2 || o.temat) : (o.temat3 || o.temat)) };
+      c.kl = new Klient(c.host, c.port, '/mqtt', cid + '-' + nr);
+      c.stan = { stan: 'laczy', opis: 'lacze z brokerem…' };
+      POL.push(c); POL.sort((x, y) => x.nr - y.nr);
+      zrobDriver(c); podepnijOdbior(c);
+      M.rezerwaBrak = (POL.length < 2);
+      zapisz('serwer ' + nr + ': ' + c.host + ':' + c.port + ' jako ' + user + ' (' + powod + ')');
+      c.polaczTeraz(powod);
+    };
+    /*  ⚠ POZYCJA W SPISIE STEROWNIKA TO NIE POZYCJA W APCE [zmierzone 17.09, pierwsze ogloszenie
+        spisu z basenu]: sterownik podal `glowny 192.168.1.39` i `zapas1 192.168.1.39` - oba adresy
+        domowe, bo on siedzi w tej samej sieci co broker. Apka chodzi z Pages po HTTPS i z drogi
+        zadnego z nich nie uzyje. Dlatego nie przepisujemy „slot na slot", tylko bierzemy z calego
+        spisu te adresy, KTORYCH DA SIE UZYC (`lan:0`), i ustawiamy je po kolei jako Zapas 1 i 2.
+        ⚠ STEROWNIK WYGRYWA Z WPISANYM RECZNIE - i tak ma byc [wytyczna: „zeby kopiowal sie to, co
+        ma w sterowniku 1 do 1"]. Recznie wpisany zapas jest ziarnem na czas, zanim sterownik sie
+        odezwie; potem obowiazuje to, co on mowi. Kazda taka zmiana idzie do dziennika lacza, zeby
+        nie byla cicha. */
+    const spisSerwerow = tekst => {
+      let s = null; try { s = JSON.parse(tekst); } catch (e) { return; }
+      if (!s) return;
+      M.ostSpisSerwerow = s;                  /* do podgladu w serwisie: komplet, takze adresy domowe */
+      /*  KTORYM SLOTEM STEROWNIKA JEST TA DROGA - patrz uzasadnienie przy `niesieNr`. */
+      if (_zrodlo && s.ja) { _zrodlo.slot = s.ja;
+        if (_zrodlo.slotOst !== s.ja) { _zrodlo.slotOst = s.ja;
+          zapisz(etyk(_zrodlo) + 'to jest slot ' + s.ja + ' sterownika'); } }
+      const nasz = adres(o.host).host;
+      const kand = [];
+      ['glowny', 'zapas1', 'zapas2'].forEach(k => {
+        const w = s[k]; const h = ((w && w.host) || '').trim();
+        if (!h || (w && w.lan)) return;                       /* pusto albo adres domowy - nie dla apki */
+        const a = adres(h).host;
+        if (a !== nasz && kand.indexOf(a) < 0) kand.push(h);   /* glownego apki nie dublujemy */
+      });
+      [2, 3].forEach((nr, i) => {
+        const host = kand[i];
+        if (!host) return;                    /* sterownik nie ma tylu uzytecznych adresow */
+        const nowy = adres(host);
+        const c = POL.find(x => x.nr === nr);
+        if (c && c.host === nowy.host) return;                /* juz to mamy - cisza */
+        zapiszUstawienie(nr === 2 ? 'host2' : 'host3', host);
+        if (!c) { dodajSerwer(nr, host, 'spis ze sterownika'); return; }
+        if (c.stan.stan === 'ok') {
+          zapisz('serwer ' + nr + ': sterownik podaje ' + nowy.host + ', a obecny (' + c.host
+                 + ') dziala - zmieniam po ponownym uruchomieniu apki');
+          return;
+        }
+        zapisz('serwer ' + nr + ': sterownik podaje ' + nowy.host + ' zamiast ' + c.host + ' - podmieniam');
+        if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
+        try { if (c.kl.isConnected()) c.kl.disconnect(); } catch (e) {}
+        try { if (c.gniazdo) c.gniazdo.close(); } catch (e) {}
+        Object.keys(obiekty).forEach(p => { if (obiekty[p].kl === c) obiekty[p].kl = null; });
+        POL.splice(POL.indexOf(c), 1);
+        dodajSerwer(nr, host, 'zmiana w sterowniku');
+      });
+    };
 
     /*  STRAZNIK CISZY - MARTWE GNIAZDO UDAJE POLACZENIE [D-355, 2026-09-13]
         ------------------------------------------------------------
