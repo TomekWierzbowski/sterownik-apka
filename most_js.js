@@ -929,7 +929,7 @@
               «odbieram tematy»"]. Pod spodem to nadal dopisek `niesie=N` w `zadanie`, ktory kaze
               sterownikowi kierowac tam `zm` i `blok` - ale czytajacy dziennik chce wiedziec, ktora
               droga PLYNA DANE, a nie jak sie o to prosi. */
-          zapisz(nr ? 'odbieram dane przez ' + NAZWA_DROGI(nr) : 'odbieram dane RÓWNOLEGLE wszystkimi drogami'); }
+          zapisz(nr ? 'odbieram dane przez ' + NAZWA_DROGI(nr) : 'odbieram dane równolegle'); }
       }
       /*  ŻĄDANIE IDZIE WSZYSTKIMI DROGAMI [D-327, uwaga z audytu]: dotąd szło tylko tą, którą uważamy
           za niosącą. Gdy sterownik straci WŁAŚNIE tego brokera, prośba leci w próżnię, a sterownik
@@ -1264,10 +1264,10 @@
         żeby odróżnić „sterownik padł" od „ten broker już go nie obsługuje" (testament - D-314). */
     const CIEZKIE = ['zm', 'blok'];
     const odepnijCiezkie = c => { if (c.lekki) return; c.lekki = true;
-      try { CIEZKIE.forEach(tm => c.kl.unsubscribe(c.temat + '/' + tm)); zapisz(etyk(c) + 'przestaję tędy odbierać dane - te same paczki idą drugą drogą'); } catch (e) {} };
+      try { CIEZKIE.forEach(tm => c.kl.unsubscribe(c.temat + '/' + tm)); zapisz(etyk(c) + 'nie odbieram danych - te same paczki idą drugą drogą'); } catch (e) {} };
     const wepnijCiezkie = c => { if (!c.lekki || !c.kl.isConnected()) return; c.lekki = false;
       try { TEMATY.filter(tm => CIEZKIE.indexOf(tm[0]) >= 0).forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
-            zapisz(etyk(c) + 'odbieram dane także tędy'); } catch (e) {} };
+            zapisz(etyk(c) + 'odbieram dane tędy'); } catch (e) {} };
     const zrobDriver = c => {
       c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
       c.dzialaloOd = 0;   /* [D-407] kiedy to połączenie NAPRAWDĘ stanęło - stąd wiadomo, czy zerować odstęp */
