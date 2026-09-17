@@ -1678,6 +1678,16 @@
       let s = null; try { s = JSON.parse(tekst); } catch (e) { return; }
       if (!s) return;
       M.ostSpisSerwerow = s;                  /* do podgladu w serwisie: komplet, takze adresy domowe */
+      /*  ⚠ ZASTANY SPIS BYWA SPRZED ZMIANY FIRMWARE [D-426]. Gdy brakuje w nim pola, ktorego
+          potrzebujemy do opisania slotow (`pol` = czy sterownik ma tam polaczenie), prosimy
+          sterownik o swiezy - raz, zeby nie robic z tego petli. Milczenie o stanie slotu jest
+          lepsze niz falsz, ale gorsze niz odpowiedz. */
+      if (s.glowny && s.glowny.pol === undefined && !M._spisProszony) {
+        M._spisProszony = true;
+        try { const kk = klGot(wybrany); if (kk) { const m = new Paho.Message('serwery');
+              m.destinationName = wybrany + '/zadanie'; kk.send(m);
+              zapisz('spis serwerow bez stanu slotow - proszę sterownik o świeży'); } } catch (e) {}
+      }
       /*  KTORYM SLOTEM STEROWNIKA JEST TA DROGA - patrz uzasadnienie przy `niesieNr`. */
       if (_zrodlo && s.ja) { _zrodlo.slot = s.ja;
         if (_zrodlo.slotOst !== s.ja) { _zrodlo.slotOst = s.ja;
