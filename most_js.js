@@ -1354,8 +1354,19 @@
         c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.nieudane = 0;
         c.odmowaKonta = false;           /* [D-422] konto jednak jest - zdejmujemy znacznik */
         c.dzialaloOd = Date.now();       /* [D-407] połączenie NAPRAWDĘ stanęło - dopiero to pozwala zerować odstęp */
-        /* [D-408] krótki meldunek do serwisu - po chwili, gdy subskrypcje i wybór obiektu już stoją */
-        setTimeout(() => { try { if (M.wyslijDziennik) M.wyslijDziennik(false); } catch (e) {} }, 4000);
+        /*  [D-408] meldunek do serwisu - po chwili, gdy subskrypcje i wybor obiektu juz stoja.
+            [D-430] PO ZERWANIU idzie PELNY dziennik: wtedy jest po co, bo w nim siedzi przyczyna.
+            Inaczej z telefonu widac tylko jedna linie skrotu i szuka sie na oslep - dokladnie tak
+            zgubilem dzis wyjatek `m is not defined`, ktory zrywal polaczenie co sekunde.
+            ⚠ Nie czesciej niz raz na minute: pelny dziennik to 2-3 kB, a apka ze zrywajacym sie
+              laczem zalalaby brokera wlasnie wtedy, gdy lacze ledwo dycha. */
+        setTimeout(() => { try {
+          if (!M.wyslijDziennik) return;
+          const teraz = Date.now();
+          const pelny = ponownie && (!M._pelnyLog || teraz - M._pelnyLog > 60000);
+          if (pelny) M._pelnyLog = teraz;
+          M.wyslijDziennik(pelny);
+        } catch (e) {} }, 4000);
         c.ostOdbior = Date.now();        /* [D-355] swiezo polaczony - strażnik ciszy liczy od teraz */
         if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
         c.stan = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
