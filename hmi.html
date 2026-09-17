@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '75dbe01364';
+window.APKA_WERSJA = '655dc483f8';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 11:14';
+window.HMI_ZBUDOWANO = '2026-09-17 13:36';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5821,6 +5821,11 @@ window.HMI_ZBUDOWANO = '2026-09-17 11:14';
               rozwinięty pasek - żeby HMI nie skakało i żeby dało się czytać dziennik na pełnym ekranie.
               Elementy `chmura-w` (czasy) i `chmura-dz` (dziennik) zachowują swoje identyfikatory, bo wypełnia je
               ten sam kod, co dotąd - zmienia się tylko miejsce, w którym wiszą. */
+          /*  [D-412] Style pol i przyciskow okna ustawien - raz, zeby nowa sekcja wygladala jak reszta
+              i zeby nie powielac tego samego napisu przy kazdym polu. */
+          const STYL_POLE = 'background:#0f1114;border:1px solid #2a2e35;color:#fff;border-radius:8px;padding:9px 10px;font:inherit;min-width:0';
+          const STYL_PRZYCISK = 'padding:9px 14px;border:0;border-radius:10px;background:#1e6fd9;color:#fff;font:inherit;font-weight:600;cursor:pointer';
+          const STYL_PRZYCISK2 = 'padding:9px 14px;border:1px solid #3a4049;border-radius:10px;background:#20242b;color:#d0d4da;font:inherit;cursor:pointer';
           const u = document.createElement('div'); u.id = 'ustawienia';
           u.style.cssText = 'position:fixed;inset:0;z-index:120;background:#14161a;color:#fff;display:none;'
             + 'flex-direction:column;font:14px/1.45 system-ui,sans-serif';
@@ -5835,6 +5840,30 @@ window.HMI_ZBUDOWANO = '2026-09-17 11:14';
               + '</div>'
               + '<div id="ust-brokery" hidden><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
                 + '<div id="ust-brokery-l"></div></div>'
+              /*  REZERWA STEROWNIKA [D-412] - TYLKO SERWIS. Sterownik trzyma u siebie trzeci adres
+                  (rezerwe), ktory sam wstawia na miejsce zapasu, gdy ten zamilknie [D-383]. Dotad
+                  zmienialo sie to wylacznie przy sterowniku; teraz widac to i zmienia sie stad.
+                  ⚠ Uklad pol odpowiada gramatyce rozkazu sterownika (adres, port, uzytkownik, haslo) -
+                    nie wymyslamy wlasnej kolejnosci, zeby serwis czytal jedno i to samo w obu miejscach. */
+              + '<div id="ust-rezerwa" hidden><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">REZERWA STEROWNIKA</div>'
+                + '<div id="ust-rez-stan" style="margin-bottom:8px"></div>'
+                + '<div style="display:flex;flex-direction:column;gap:7px">'
+                  + '<div style="display:flex;gap:7px"><input id="ust-rez-host" placeholder="adres brokera rezerwowego" autocapitalize="off" autocorrect="off" spellcheck="false" style="' + STYL_POLE + ';flex:1 1 auto">'
+                    + '<input id="ust-rez-port" placeholder="8883" inputmode="numeric" style="' + STYL_POLE + ';width:78px;flex:0 0 auto"></div>'
+                  + '<input id="ust-rez-user" placeholder="użytkownik sterownika na tym brokerze" autocapitalize="off" autocorrect="off" spellcheck="false" style="' + STYL_POLE + '">'
+                  + '<input id="ust-rez-pass" type="password" placeholder="hasło sterownika na tym brokerze" autocomplete="off" style="' + STYL_POLE + '">'
+                  + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">'
+                    + '<button id="ust-rez-zapisz" style="' + STYL_PRZYCISK + '">Zapisz w sterowniku</button>'
+                    + '<button id="ust-rez-test" style="' + STYL_PRZYCISK2 + '">Sprawdź teraz</button>'
+                    + '<button id="ust-rez-kasuj" style="' + STYL_PRZYCISK2 + '">Skasuj rezerwę</button></div>'
+                  /*  JEDNA LINIA NA SLOWA STEROWNIKA [D-412]. Byly dwie - „ostatni meldunek"
+                      i „odpowiedz na moj rozkaz" - i potrafily mowic co innego o tej samej rzeczy.
+                      Teraz jedna: apka pisze tu tylko wtedy, gdy rozkaz W OGOLE NIE WYSZEDL
+                      (zle znaki, brak PIN-u, brak lacza); w kazdym innym przypadku stoi tu
+                      NAJSWIEZSZE zdanie sterownika i zmienia sie tyle razy, ile razy on cos powie. */
+                  + '<div id="ust-rez-odp" style="font-size:12px;color:#9fd3ff;min-height:16px"></div>'
+                  + '<div style="font-size:11px;color:#8d949e">Zmiana wymaga PIN-u serwisowego sterownika. Hasło jedzie do sterownika, a nie do aplikacji — nie zobaczysz go tu z powrotem.</div>'
+                + '</div></div>'
               + '<div id="ust-czasy"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
                 + '<span id="chmura-w" style="font-size:12px;color:#98a0ad"></span></div>'
               + '<div id="ust-dziennik" style="display:flex;flex-direction:column;min-height:0"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
@@ -5850,6 +5879,37 @@ window.HMI_ZBUDOWANO = '2026-09-17 11:14';
           const ustPokaz = w => { u.style.display = w ? 'flex' : 'none'; if (w) ustDziennik(); };
           document.getElementById('chmura-ust').onclick = () => ustPokaz(u.style.display === 'none');
           document.getElementById('ust-zamknij').onclick = () => ustPokaz(false);
+          /*  REZERWA - OBSLUGA PRZYCISKOW [D-412]
+              ⚠ KAZDY PRZYCISK GASNIE NA CZAS CZEKANIA. Rozkaz idzie do sterownika i wraca meldunkiem
+                po sekundach (przy `zapas:test` nawet po kilkudziesieciu - sterownik naprawde probuje
+                sie polaczyc z rezerwa). Klikniecie drugi raz wyslaloby drugi rozkaz w tlo pierwszego,
+                a czlowiek zobaczylby dwa meldunki i nie wiedzial, ktory jest o czym.
+              ⚠ ODPOWIADA ZAWSZE ZDANIE STEROWNIKA, nie nasze „wyslano" (zasada 10). Jedyne zdania
+                od apki to te, ktore powstaja PRZED wyslaniem: zle znaki w polach albo brak PIN-u. */
+          {
+            const el = i => document.getElementById(i);
+            const odp = el('ust-rez-odp');
+            const guziki = ['ust-rez-zapisz', 'ust-rez-test', 'ust-rez-kasuj'];
+            const zajete = w => guziki.forEach(g => { const b = el(g); if (b) { b.disabled = w; b.style.opacity = w ? '.5' : '1'; } });
+            /*  `wynik` NIE przepisuje zdania sterownika - to robi odswiezanie sekcji, ktore czyta
+                NAJSWIEZSZY meldunek. Tutaj zostaje tylko odblokowanie przyciskow i te zdania, ktore
+                sterownika nigdy nie dosiegly (`nieposzlo` - wtedy zadnego meldunku nie bedzie). */
+            const NIEPOSZLO = /^(podaj |adres bez|port poza|użytkownik bez|hasło bez|bez PIN|brak połączenia|nie wybrano|rozkaz za długi|nie udało)/;
+            const wynik = t => { zajete(false);
+              if (odp && NIEPOSZLO.test(t)) { odp.textContent = t; odp._wlasne = Date.now(); } };
+            const czekam = t => { zajete(true); if (odp) { odp.textContent = t; odp._wlasne = 0; } };
+            const R = () => (window.MOST_JS && window.MOST_JS.rezerwa) || null;
+            el('ust-rez-test').onclick = () => { const r = R(); if (!r) return;
+              czekam('sprawdzam rezerwę - sterownik próbuje się z nią połączyć…'); r.test().then(wynik); };
+            el('ust-rez-zapisz').onclick = () => { const r = R(); if (!r) return;
+              czekam('zapisuję w sterowniku…');
+              r.ustaw(el('ust-rez-host').value, el('ust-rez-port').value || 8883,
+                      el('ust-rez-user').value, el('ust-rez-pass').value)
+               .then(t => { wynik(t); el('ust-rez-pass').value = ''; }); };
+            el('ust-rez-kasuj').onclick = () => { const r = R(); if (!r) return;
+              if (!confirm('Skasować rezerwowy broker zapisany w sterowniku? Zostanie bez drogi zapasowej.')) return;
+              czekam('kasuję rezerwę…'); r.kasuj().then(wynik); };
+          }
           /* PLANSZA „BRAK POŁĄCZENIA" - pod paskiem, nad HMI (z-index 98 < 99 paska) */
           const b = document.createElement('div'); b.id = 'chmura-brak';
           b.style.cssText = 'position:fixed;left:0;right:0;top:var(--pasek,0);bottom:0;z-index:98;background:#2a2e35;color:#fff;'
@@ -5950,6 +6010,56 @@ window.HMI_ZBUDOWANO = '2026-09-17 11:14';
               + '<div style="color:#98a0ad;font-size:12px">' + x.host + ' · ' + x.user + ' · ' + x.temat + '</div>'
               + '<div style="color:#d0d4da;font-size:12px">' + x.opis + '</div></div>').join('');
             if (ublL._html !== html) { ublL._html = html; ublL.innerHTML = html; }
+          }
+        }
+        /*  REZERWA: POKAZUJEMY TO, CO STEROWNIK NAPRAWDE MA  [D-412]
+            ------------------------------------------------------------
+            WEJSCIA:  `MOST_JS.rezerwa.spis()` - spis z tematu `serwery` [D-411]; `.ostatni()` -
+                      ostatni meldunek z tematu `zapas`.
+            CO Z CZEGO WYNIKA: trzy wiersze (glowny / zapas / rezerwa) plus zdanie sterownika.
+            WYJSCIA:  tresc sekcji + JEDNORAZOWE podpowiedzi w polach adresu i portu.
+
+            ⚠ POLA WYPELNIAMY RAZ I TYLKO PUSTE. Sekcja odswieza sie przy kazdej paczce (co sekunde),
+              wiec przepisywanie wartosci kasowaloby to, co czlowiek wlasnie wpisuje - literę po literze.
+            ⛔ HASLA NIE PODPOWIADAMY I PODPOWIEDZIEC NIE MOZEMY: sterownik go nie oddaje (i dobrze).
+            ⚠ ADRES DOMOWY OZNACZAMY: 192.168.x.x dziala dla sterownika, ale nie dla telefonu w drodze -
+              bez tej uwagi serwis probowalby wpisac go jako rezerwe i dziwil sie, czemu apka go nie widzi. */
+        const urez = document.getElementById('ust-rezerwa');
+        if (urez) {
+          urez.hidden = !serwisowy;
+          const R = (window.MOST_JS && window.MOST_JS.rezerwa) || null;
+          const sp = R && R.spis();
+          const wiersz = (nazwa, w, dopisek) => {
+            if (!w || !w.host) return '<div style="margin-bottom:4px"><b>' + nazwa + '</b> <span style="color:#8d949e">— nie ustawiony</span></div>';
+            return '<div style="margin-bottom:4px"><b>' + nazwa + '</b> <span style="color:#d0d4da">' + w.host + ':' + w.port + '</span>'
+                 + (w.tls ? ' <span style="color:#8d949e">szyfrowane</span>' : ' <span style="color:#d08b5b">gołe</span>')
+                 + (w.lan ? ' <span style="color:#8d949e">· adres domowy (telefon w drodze go nie użyje)</span>' : '')
+                 + (dopisek || '') + '</div>';
+          };
+          const ZAP_STAN = ['nie sprawdzana', 'żywa', 'nie odpowiada', 'nie ustawiona'];
+          const st = document.getElementById('ust-rez-stan');
+          if (st) {
+            const html = sp
+              ? wiersz('główny', sp.glowny, sp.niesie === 1 ? ' <span style="color:#9fd3ff">← tym nadaje</span>' : '')
+                + wiersz('zapas', sp.zapas1, sp.niesie === 2 ? ' <span style="color:#9fd3ff">← tym nadaje</span>' : '')
+                + wiersz('rezerwa', sp.zapas2, ' <span style="color:#8d949e">· ' + (ZAP_STAN[sp.zapas2 && sp.zapas2.stan] || '?') + '</span>')
+              : '<div style="color:#8d949e">sterownik jeszcze nie podał spisu serwerów</div>';
+            if (st._html !== html) { st._html = html; st.innerHTML = html; }
+          }
+          /*  NAJSWIEZSZE ZDANIE STEROWNIKA - patrz uzasadnienie przy `ust-rez-odp`.
+              ⚠ Wlasnej odmowy apki nie zamazujemy przez 8 s: czlowiek ma zdazyc przeczytac, czemu
+                rozkaz nie wyszedl, zanim wskoczy tam stary meldunek sprzed tygodnia. */
+          const odp = document.getElementById('ust-rez-odp'), om = R && R.ostatni();
+          if (odp && !(odp._wlasne && Date.now() - odp._wlasne < 8000)) {
+            const t = om ? (om.txt + (om.zastany ? ' · zdanie zastane na brokerze, nie odpowiedź na Twój rozkaz' : ''))
+                         : 'sterownik nie meldował nic o rezerwie';
+            if (odp.textContent !== t) odp.textContent = t;
+          }
+          if (sp && sp.zapas2 && sp.zapas2.host && !urez._podpowiedziane) {
+            urez._podpowiedziane = true;
+            const h = document.getElementById('ust-rez-host'), pt = document.getElementById('ust-rez-port');
+            if (h && !h.value) h.value = sp.zapas2.host;
+            if (pt && !pt.value) pt.value = sp.zapas2.port;
           }
         }
         const uob = document.getElementById('ust-ob');
@@ -10577,6 +10687,12 @@ body:not(.bez-wody) .screen,body.bez-wody .screen{border-radius:0}
 #chmura>span,#chmura>b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 #chmura>b{flex:0 0 auto}
 #chmura select{font-size:11px!important;max-width:38vw}
+/*  ⚠ `hidden` MA ZNACZYĆ „NIE MA” TAKŻE PRZY STYLU INLINE [D-412, znalezione przy czytaniu kodu 17.09].
+   Styl przeglądarki `[hidden]{display:none}` przegrywa z `style="display:flex"` wpisanym w element -
+   a tak właśnie zbudowana jest sekcja DZIENNIK ŁĄCZA. Skutek: od D-366 chowaliśmy ją przed klientem
+   atrybutem `hidden`, a ona cały czas była widoczna. Reguła z `!important` zamyka to raz dla wszystkich
+   sekcji okna - także tych dołożonych później. */
+[hidden]{display:none!important}
 #chmura .chm-t{display:none}            /* opisy tylko w oknie ustawień - w pasku zostają kropki */
 #ustawienia .chm-t{display:inline!important}
 #chmura-ust{font-size:15px!important}

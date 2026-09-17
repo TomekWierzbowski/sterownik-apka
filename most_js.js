@@ -632,6 +632,7 @@
     const obiekty = {};                 /* prefiks -> {txt, kiedy, status} */
     const zdarzenia = {};               /* prefiks -> {ile, zgubione, wpisy[[czas,kat,kod,zr,ob,a,b,c]]} [D-295] */
     let czekaPliki = null, czekaPlik = null;                      /* prośby o listę / plik z karty SD [D-297] */
+    let czekaZapas = null;                                        /* [D-412] kto czeka na meldunek o rezerwie */
     /*  PROSBA O OKRES - OSOBNA NA KAZDA KATEGORIE [D-348, 2026-09-12]
         ------------------------------------------------------------
         WEJSCIA:  zadania `/okres?kat=zdarzenia` i `/okres?kat=alarmy`; odpowiedzi z tematu `okres`.
@@ -983,6 +984,17 @@
         return;
       }
       if (rodzaj === 'serwery') { spisSerwerow(m.payloadString); return; }   /* [D-411] */
+      if (rodzaj === 'zapas') {                     /* [D-412] meldunek sterownika o rezerwie */
+        const pref = cz.slice(0, -1).join('/');
+        const txt = m.payloadString || '';
+        M.ostZapas = { obiekt: pref, txt, kiedy: Date.now(), zastany: !!m.retained };
+        /*  ⚠ RETAINED TO MELDUNEK ZASTANY, NIE ODPOWIEDZ NA NASZ ROZKAZ. Leci od razu po
+            subskrypcji i potrafi byc sprzed tygodnia - gdyby liczyl sie jako odpowiedz, ekran
+            pokazywalby „zrobione" zanim sterownik cokolwiek przeczytal. */
+        if (!m.retained) { zapisz('rezerwa: ' + txt); if (czekaZapas) { const f = czekaZapas; czekaZapas = null; f(txt); } }
+        if (pref === wybrany) oddaj();
+        return;
+      }
       if (rodzaj === 'pliki') {                     /* lista plików z karty [D-297]: "#kat\nnazwa;rozmiar\n..." albo "!brak karty" */
         if (!czekaPliki) return; const c = czekaPliki; czekaPliki = null; clearTimeout(c.t);
         const l = m.payloadString.split('\n').filter(x => x.trim()); const brak = l.some(x => x[0] === '!');
@@ -1147,7 +1159,12 @@
         dziennik, karta SD), qos 0 tam, gdzie i tak przyjdzie następna (blok, stan, status, wynik). */
     const TEMATY = [['blok', 0], ['zm', 1], ['status', 0], ['wynik', 0], ['stan', 0],
                     ['zdarzenia', 1], ['zd', 1], ['pliki', 1], ['plik', 1], ['okres', 1],
-                    ['serwery', 0]];   /* [D-411] spis brokerow prosto ze sterownika - retained, przyjdzie od razu */
+                    ['serwery', 0], ['zapas', 0]];
+    /*  [D-411] `serwery` = spis brokerow prosto ze sterownika (retained, przyjdzie od razu).
+        [D-412] `zapas`  = MELDUNKI O REZERWIE, po polsku, pisane przez sterownik. To jedyna droga,
+        ktora mowi, co sie stalo z rozkazem `zapas:...` - odpowiedzi NIE MA w temacie `wynik`
+        (sprawdzone na sprzecie 17.09: rozkaz z blednym PIN-em odpowiedzial „zmiana rezerwy wymaga
+        PIN" wylacznie tematem `zapas`). Bez tej subskrypcji ekran serwisu wysylalby rozkaz w cisze.
     /*  CIĘŻKIE I LEKKIE [D-315]: sterownik nadaje każdą paczkę na WSZYSTKIE podłączone brokery (zmierzone:
         zgłoszenie na jednym włącza strumień na obu), więc przy dwóch brokerach telefon odbierał wszystko dwa razy.
         `zm` i `blok` to praktycznie cały ruch - te zostają tylko na brokerze, który NIESIE obiekt. Lekkie
@@ -1345,6 +1362,98 @@
         Kod 0 → PIN dobry, zapamiętujemy go do kolejnych zmian serwisowych (bez pytania drugi raz).
         Zwraca 'ok' | 'zle' | <komunikat>. Ekran serwisu w apce woła to przy wejściu, więc PIN
         jest JEDEN — ten ze sterownika. */
+    /*  REZERWOWY BROKER — OGLADANIE I ZMIANA Z APKI  [D-412, Tomasz 2026-09-17: „tak brac"
+        (na pytanie, czy robic zmiane rezerwy z apki za PIN-em)]
+        ═══════════════════════════════════════════════════════════════════════════════════════
+        WEJSCIA:   spis serwerow ze sterownika (`M.ostSpisSerwerow`, D-411), meldunki z tematu
+                   `zapas`, PIN serwisowy sterownika (ten sam, ktory otwiera menu serwisowe).
+        CO Z CZEGO WYNIKA: serwis widzi, co sterownik ma w rezerwie, i moze to zmienic bez
+                   podchodzenia do szafy — jednym rozkazem w tym samym temacie `zadanie`,
+                   ktorym apka i tak prosi o dane.
+        WYJSCIA:   `M.rezerwa.test() / .ustaw() / .kasuj()` — kazda oddaje ZDANIE STEROWNIKA,
+                   nie wlasne „wyslano".
+
+        ⚠ ODPOWIEDZI NIE MA W TEMACIE `wynik`. `zapas:` nie idzie droga komend (tam jest `id`
+          i kod liczbowy), tylko droga zadan — a sterownik melduje po polsku tematem `zapas`.
+          Zmierzone 17.09: bledny PIN odpowiedzial „zmiana rezerwy wymaga PIN" wylacznie tam.
+          Dlatego czekamy na meldunek, a nie na kod.
+
+        ⚠ JEDNYM BROKEREM, NIE WSZYSTKIMI. Zwykle zadania apka rozsyla kazda droga [D-327], bo
+          powtorka nic nie kosztuje. Tutaj kosztuje: rozkaz doszedlby dwa razy, sterownik dwa razy
+          zapisalby NVS i dwa razy oglosil wynik, a czlowiek zobaczylby dwa meldunki na jedno
+          klikniecie. Rozkaz idzie wiec TA droga, ktora obiekt naprawde dociera.
+
+        ⚠ BRAMKI NA SKLADNIE SA PO NASZEJ STRONIE, BO STEROWNIK ICH NIE MA. Rozbiera rozkaz
+          `strchr(':')` i `strstr(";pin=")`, wiec dwukropek w hasle rozjechalby pola, a srednik
+          uciąłby PIN — i to bez zadnego bledu, po prostu zapisalaby sie bzdura. Zamiast tego
+          mowimy wprost, czego nie wolno (zasada 10). Limit dlugosci z `char buf[240]` w firmware.
+
+        ⛔ HASLO REZERWY TO HASLO STEROWNIKA DO CUDZEGO BROKERA, nie haslo klienta. Idzie tresci
+          rozkazu, wiec wylacznie po szyfrowanym polaczeniu (apka z Pages laczy sie po wss) i
+          NIGDY nie trafia do dziennika lacza — w `zapisz()` ponizej jedzie sam adres. */
+    const REZ_ZLE_ZNAKI = /[:;\s]/;
+    const rezRozkaz = (tresc, coTxt) => new Promise(res => {
+      if (!wybrany) { res('nie wybrano sterownika'); return; }
+      const kk = klGot(wybrany);
+      if (!kk) { res('brak połączenia z brokerem'); return; }
+      if (tresc.length > 200) { res('rozkaz za długi (' + tresc.length + ' znaków, mieści się 200)'); return; }
+      let oddane = false;
+      const oddaj1 = t => { if (oddane) return; oddane = true; if (czekaZapas === oddaj1) czekaZapas = null; res(t); };
+      czekaZapas = oddaj1;
+      try {
+        const msg = new Paho.Message(tresc); msg.destinationName = wybrany + '/zadanie'; msg.qos = 1;
+        kk.send(msg);
+      } catch (e) { oddaj1('nie udało się wysłać: ' + e); return; }
+      zapisz('rezerwa: ' + coTxt);
+      /*  ⚠ TEN SAM ROZKAZ DWA RAZY W CIAGU 3 s STEROWNIK ODRZUCA W MILCZENIU (SIEC_ODB_DUBEL_MS -
+          odsiew powtorki idacej druga droga [D-327]). Przyciski gasna na czas czekania, wiec czlowiek
+          tego nie wywola; gdyby jednak doszlo do powtorki, skonczy sie ona naszym „sterownik nie
+          odpowiedzial w 15 s" - i to jest uczciwa odpowiedz, bo rozkaz naprawde nie zostal wykonany. */
+      /*  15 s, nie 5 jak przy komendach: `zapas:test` melduje „sprawdzam…" od razu, ale przy
+          zajętym stosie pierwszy meldunek potrafi się spóźnić (uzgadnianie TLS - patrz
+          ZAP_PROBA_MS w firmware, podniesione z 15 na 40 s z tego samego powodu). */
+      setTimeout(() => oddaj1('sterownik nie odpowiedział w 15 s'), 15000);
+    });
+    /*  PIN: ten sam, ktory otwiera menu serwisowe [2026-09-09, Tomasz: „PIN do serwisu taki, jaki
+        jest ustawiony w sterowniku"]. Gdy juz byl podany w tej sesji - nie pytamy drugi raz. */
+    const rezPin = () => {
+      if (pinSerwis) return pinSerwis;
+      const p = prompt('Zmiana rezerwy wymaga PIN-u serwisowego sterownika:', '');
+      if (!p) return null;
+      pinSerwis = p;      /* gdy zly - sterownik powie to wprost, a nastepna proba zapyta znowu */
+      return p;
+    };
+    M.rezerwa = {
+      spis: () => M.ostSpisSerwerow || null,
+      ostatni: () => M.ostZapas || null,
+      test: () => rezRozkaz('zapas:test', 'sprawdź teraz'),
+      kasuj: () => { const p = rezPin(); if (!p) return Promise.resolve('bez PIN-u nic nie zmieniam');
+                     return rezRozkaz('zapas:kasuj;pin=' + p, 'skasuj rezerwę')
+                            .then(t => { if (/wymaga PIN/.test(t)) pinSerwis = null; return t; }); },
+      ustaw: (host, port, user, haslo) => {
+        const h = String(host || '').trim().replace(/^mqtts?:\/\//, '').replace(/\/.*$/, '');
+        const u = String(user || '').trim(), p = String(haslo || '');
+        const nr = parseInt(port, 10);
+        /*  ⚠ DLUGOSCI Z FIRMWARE, NIE Z OKA [D-412]: sterownik trzyma adres w 64 znakach, konto
+            i haslo w 32 (SIEC_TXT_DLUGI / SIEC_TXT_KROTKI), a caly rozkaz kopiuje do bufora 240
+            znakow i TNIE BEZ SLOWA. Urwalby sie wtedy ogon z `;pin=`, a sterownik odpowiedzialby
+            „zmiana rezerwy wymaga PIN" - przy PIN-ie, ktory przeciez zostal podany. Wolimy odmowic
+            tutaj i nazwac prawdziwy powod. */
+        if (!h) return Promise.resolve('podaj adres brokera rezerwowego');
+        if (REZ_ZLE_ZNAKI.test(h)) return Promise.resolve('adres bez dwukropka, średnika i spacji - port wpisz w osobnym polu');
+        if (h.length > 64) return Promise.resolve('adres dłuższy niż 64 znaki - sterownik tyle nie zapamięta');
+        if (!(nr >= 1 && nr <= 65535)) return Promise.resolve('port poza zakresem 1-65535');
+        if (!u) return Promise.resolve('podaj użytkownika, którym sterownik ma się logować');
+        if (REZ_ZLE_ZNAKI.test(u)) return Promise.resolve('użytkownik bez dwukropka, średnika i spacji - sterownik rozbiera rozkaz po tych znakach');
+        if (u.length > 32) return Promise.resolve('użytkownik dłuższy niż 32 znaki - sterownik tyle nie zapamięta');
+        if (!p) return Promise.resolve('podaj hasło sterownika do brokera rezerwowego');
+        if (REZ_ZLE_ZNAKI.test(p)) return Promise.resolve('hasło bez dwukropka, średnika i spacji - sterownik rozbiera rozkaz po tych znakach');
+        if (p.length > 32) return Promise.resolve('hasło dłuższe niż 32 znaki - sterownik tyle nie zapamięta');
+        const pin = rezPin(); if (!pin) return Promise.resolve('bez PIN-u nic nie zmieniam');
+        return rezRozkaz('zapas:' + h + ':' + nr + ':' + u + ':' + p + ';pin=' + pin, 'ustaw ' + h + ':' + nr)
+               .then(t => { if (/wymaga PIN/.test(t)) pinSerwis = null; return t; });
+      },
+    };
     M.sprawdzPin = pin => new Promise(res => {
       if (!wybrany || !klGot(wybrany)) { res('brak połączenia z brokerem'); return; }
       const zg = zegar[wybrany];
