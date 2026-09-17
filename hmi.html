@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '1e215dba97';
+window.APKA_WERSJA = 'c9e40077f4';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 10:41';
+window.HMI_ZBUDOWANO = '2026-09-17 11:14';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5837,28 +5837,10 @@ window.HMI_ZBUDOWANO = '2026-09-17 10:41';
                 + '<div id="ust-brokery-l"></div></div>'
               + '<div id="ust-czasy"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
                 + '<span id="chmura-w" style="font-size:12px;color:#98a0ad"></span></div>'
-              + '<div id="ust-dziennik" style="display:flex;flex-direction:column;min-height:0">'
-                /*  [D-408] „Wyślij do serwisu" — dziennik leci na temat `<obieg>/apka`. Dotąd jedyną
-                    drogą do tego, co widzi telefon klienta, był zrzut ekranu i przepisywanie linia
-                    po linii; przy zdalnym obiekcie to godziny. Świadomie PRZYCISK, nie ciągłe
-                    nadawanie: temat ma służyć diagnozie, nie być drugim strumieniem stanu. */
-                + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
-                  + '<div style="font-size:11px;letter-spacing:.08em;color:#8d949e">DZIENNIK ŁĄCZA</div>'
-                  + '<button id="dz-wyslij" type="button" style="margin-left:auto;padding:6px 12px;border:0;border-radius:8px;background:#1e6fd9;color:#fff;font-weight:600;font-size:12px">Wyślij do serwisu</button>'
-                  + '<span id="dz-wynik" style="font-size:11px;color:#8d949e"></span>'
-                + '</div>'
+              + '<div id="ust-dziennik" style="display:flex;flex-direction:column;min-height:0"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
                 + '<pre id="chmura-dz" style="margin:0;max-height:46vh;overflow:auto;font:11px/1.4 ui-monospace,monospace;color:#d0d4da;white-space:pre-wrap;background:#0f1114;border-radius:6px;padding:8px"></pre></div>'
             + '</div>';
           document.body.appendChild(u);
-          /*  [D-408] wysyłka dziennika do serwisu — mówimy WPROST, czy poszło. Milczący przycisk
-              przy diagnostyce jest bezużyteczny: klient nie wie, czy ma klikać dalej. */
-          const bw = document.getElementById('dz-wyslij');
-          if (bw) bw.onclick = () => {
-            const w = document.getElementById('dz-wynik');
-            const ok = !!(window.MOST_JS && window.MOST_JS.wyslijDziennik && window.MOST_JS.wyslijDziennik(true));
-            if (w) { w.textContent = ok ? 'wysłane' : 'brak połączenia — spróbuj, gdy serwer będzie zielony';
-                     w.style.color = ok ? '#7bd88f' : '#e88'; }
-          };
           /* dziennik wypełniamy OD RAZU po otwarciu - inaczej sekcja stała pusta do następnego pakietu */
           const ustDziennik = () => { const dz = document.getElementById('chmura-dz');
             const dl = (window.MOST_JS && window.MOST_JS.dziennik) || [];
