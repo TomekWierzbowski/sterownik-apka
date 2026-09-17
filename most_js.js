@@ -987,12 +987,21 @@
       if (rodzaj === 'zapas') {                     /* [D-412] meldunek sterownika o rezerwie */
         const pref = cz.slice(0, -1).join('/');
         const txt = m.payloadString || '';
-        M.ostZapas = { obiekt: pref, txt, kiedy: Date.now(), zastany: !!m.retained };
+        /*  ⛔ TYLKO WYBRANY OBIEKT [poprawka po przegladzie]: `czekaZapas` to JEDNA zmienna, a konto
+            serwisowe oglada kilka sterownikow naraz. Bez tego warunku nocna zamiana w sadzawce
+            rozwiazywalaby obietnice kliknieta na basenie i czlowiek zobaczylby cudze zdanie jako
+            odpowiedz na swoj rozkaz. Ten sam blad naprawialismy w D-348 przy prosbach o okres. */
+        if (pref !== wybrany) return;
         /*  ⚠ RETAINED TO MELDUNEK ZASTANY, NIE ODPOWIEDZ NA NASZ ROZKAZ. Leci od razu po
             subskrypcji i potrafi byc sprzed tygodnia - gdyby liczyl sie jako odpowiedz, ekran
             pokazywalby „zrobione" zanim sterownik cokolwiek przeczytal. */
-        if (!m.retained) { zapisz('rezerwa: ' + txt); if (czekaZapas) { const f = czekaZapas; czekaZapas = null; f(txt); } }
-        if (pref === wybrany) oddaj();
+        /*  ⚠ TA SAMA TRESC DRUGA DROGA [D-315]: `zapas` jest tematem lekkim, wiec przy dwoch
+            brokerach przychodzi dwa razy. Bez odsiewu dziennik lacza dostawal dwa takie same
+            wpisy na jedno zdarzenie - a dziennik czyta sie na zrzucie ekranu. */
+        const swiezo = M.ostZapas && M.ostZapas.txt === txt && (Date.now() - M.ostZapas.kiedy) < 3000;
+        M.ostZapas = { obiekt: pref, txt, kiedy: Date.now(), zastany: !!m.retained };
+        if (!m.retained && !swiezo) { zapisz('rezerwa: ' + txt); if (czekaZapas) czekaZapas(txt); }
+        oddaj();
         return;
       }
       if (rodzaj === 'pliki') {                     /* lista plików z karty [D-297]: "#kat\nnazwa;rozmiar\n..." albo "!brak karty" */
@@ -1165,6 +1174,12 @@
         ktora mowi, co sie stalo z rozkazem `zapas:...` - odpowiedzi NIE MA w temacie `wynik`
         (sprawdzone na sprzecie 17.09: rozkaz z blednym PIN-em odpowiedzial „zmiana rezerwy wymaga
         PIN" wylacznie tematem `zapas`). Bez tej subskrypcji ekran serwisu wysylalby rozkaz w cisze.
+        ⚠ TEN KOMENTARZ MUSI SIE DOMYKAC. Przez pol dnia nie mial znaku konca i sklejal sie
+        z nastepnym - kod dzialal przypadkiem, a kazda linia dopisana tutaj zostalaby po cichu
+        zjedzona. Tak wygladala awaria z 17.09 rano: apka pokazywala demo i nie otwierala ustawien.
+        ⚠ I JESZCZE JEDNO, ZMIERZONE NA WLASNEJ SKORZE minute pozniej: samo OSTRZEZENIE tez nie
+        moze zawierac znaku konca komentarza w cudzyslowie - zamyka go w polowie zdania, a reszta
+        zdania staje sie kodem. `sprawdz_apke.ps1` zlapal to numerem linii. */
     /*  CIĘŻKIE I LEKKIE [D-315]: sterownik nadaje każdą paczkę na WSZYSTKIE podłączone brokery (zmierzone:
         zgłoszenie na jednym włącza strumień na obu), więc przy dwóch brokerach telefon odbierał wszystko dwa razy.
         `zm` i `blok` to praktycznie cały ruch - te zostają tylko na brokerze, który NIESIE obiekt. Lekkie
@@ -1397,9 +1412,21 @@
       const kk = klGot(wybrany);
       if (!kk) { res('brak połączenia z brokerem'); return; }
       if (tresc.length > 200) { res('rozkaz za długi (' + tresc.length + ' znaków, mieści się 200)'); return; }
-      let oddane = false;
-      const oddaj1 = t => { if (oddane) return; oddane = true; if (czekaZapas === oddaj1) czekaZapas = null; res(t); };
-      czekaZapas = oddaj1;
+      let oddane = false, zegarek = null;
+      const oddaj1 = t => { if (oddane) return; oddane = true;
+                            if (zegarek) clearTimeout(zegarek);
+                            if (czekaZapas === sluchaj) czekaZapas = null; res(t); };
+      /*  ⛔ „SPRAWDZAM…" TO JESZCZE NIE ODPOWIEDZ [poprawka po przegladzie]. Sterownik na jeden
+          rozkaz mowi dwa razy: najpierw „sprawdzam rezerwe <adres>", a werdykt dopiero po probie
+          polaczenia - do 40 s pozniej (ZAP_PROBA_MS w firmware, podniesione tam z 15 na 40 s, bo
+          uzgadnianie TLS przy zajetym stosie tyle potrafi trwac). Konczenie na pierwszym zdaniu
+          oddawalo przyciski w srodku trwajacej proby: kolejne klikniecie w oknie 3 s ginelo
+          w odsiewie powtorek sterownika, a po 3 s wracalo „sprawdzanie juz trwa". */
+      const przejsciowy = t => /^sprawdzam /.test(t) || /- sprawdzam$/.test(t);
+      const sluchaj = t => { if (!przejsciowy(t)) { oddaj1(t); return; }
+                             if (zegarek) clearTimeout(zegarek);
+                             zegarek = setTimeout(() => oddaj1('sterownik zaczął sprawdzać, ale nie podał wyniku'), 50000); };
+      czekaZapas = sluchaj;
       try {
         const msg = new Paho.Message(tresc); msg.destinationName = wybrany + '/zadanie'; msg.qos = 1;
         kk.send(msg);
@@ -1412,7 +1439,7 @@
       /*  15 s, nie 5 jak przy komendach: `zapas:test` melduje „sprawdzam…" od razu, ale przy
           zajętym stosie pierwszy meldunek potrafi się spóźnić (uzgadnianie TLS - patrz
           ZAP_PROBA_MS w firmware, podniesione z 15 na 40 s z tego samego powodu). */
-      setTimeout(() => oddaj1('sterownik nie odpowiedział w 15 s'), 15000);
+      zegarek = setTimeout(() => oddaj1('sterownik nie odpowiedział w 15 s'), 15000);
     });
     /*  PIN: ten sam, ktory otwiera menu serwisowe [2026-09-09, Tomasz: „PIN do serwisu taki, jaki
         jest ustawiony w sterowniku"]. Gdy juz byl podany w tej sesji - nie pytamy drugi raz. */

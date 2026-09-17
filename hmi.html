@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '655dc483f8';
+window.APKA_WERSJA = '4248272d14';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 13:36';
+window.HMI_ZBUDOWANO = '2026-09-17 13:54';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5862,6 +5862,7 @@ window.HMI_ZBUDOWANO = '2026-09-17 13:36';
                       (zle znaki, brak PIN-u, brak lacza); w kazdym innym przypadku stoi tu
                       NAJSWIEZSZE zdanie sterownika i zmienia sie tyle razy, ile razy on cos powie. */
                   + '<div id="ust-rez-odp" style="font-size:12px;color:#9fd3ff;min-height:16px"></div>'
+                  + '<div id="ust-rez-tls" style="font-size:11px;color:#8d949e"></div>'
                   + '<div style="font-size:11px;color:#8d949e">Zmiana wymaga PIN-u serwisowego sterownika. Hasło jedzie do sterownika, a nie do aplikacji — nie zobaczysz go tu z powrotem.</div>'
                 + '</div></div>'
               + '<div id="ust-czasy"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
@@ -5906,6 +5907,18 @@ window.HMI_ZBUDOWANO = '2026-09-17 13:36';
               r.ustaw(el('ust-rez-host').value, el('ust-rez-port').value || 8883,
                       el('ust-rez-user').value, el('ust-rez-pass').value)
                .then(t => { wynik(t); el('ust-rez-pass').value = ''; }); };
+            /*  SZYFROWANIE WYNIKA Z PORTU, WIEC MOWIMY O TYM PRZY POLU [poprawka po przegladzie].
+                Sterownik nie ma osobnego ptaszka „szyfruj" - liczy `tls = (port == 8883 || 8884)`.
+                Wpisanie 1883 daje polaczenie GOLE i, przy brokerze wymagajacym szyfrowania, cicho
+                konczy sie „rezerwa NIE odpowiada (40000 ms)" - komunikat, ktory kaze szukac awarii
+                brokera zamiast literowki w porcie. Zdanie liczy sie na kazde stuknieciе w pole. */
+            const tls = () => { const e = el('ust-rez-tls'), p = +(el('ust-rez-port').value || 0);
+              if (!e) return;
+              e.textContent = (p === 8883 || p === 8884)
+                ? 'Port ' + p + ' — sterownik połączy się SZYFROWANIE.'
+                : (p ? 'Port ' + p + ' — połączenie będzie GOŁE (sterownik szyfruje tylko na 8883 i 8884).' : '');
+              e.style.color = (p === 8883 || p === 8884 || !p) ? '#8d949e' : '#d08b5b'; };
+            el('ust-rez-port').oninput = tls;
             el('ust-rez-kasuj').onclick = () => { const r = R(); if (!r) return;
               if (!confirm('Skasować rezerwowy broker zapisany w sterowniku? Zostanie bez drogi zapasowej.')) return;
               czekam('kasuję rezerwę…'); r.kasuj().then(wynik); };
@@ -6059,7 +6072,8 @@ window.HMI_ZBUDOWANO = '2026-09-17 13:36';
             urez._podpowiedziane = true;
             const h = document.getElementById('ust-rez-host'), pt = document.getElementById('ust-rez-port');
             if (h && !h.value) h.value = sp.zapas2.host;
-            if (pt && !pt.value) pt.value = sp.zapas2.port;
+            if (pt && !pt.value) { pt.value = sp.zapas2.port;
+              try { pt.oninput && pt.oninput(); } catch (e) {} }   /* podpowiedz o szyfrowaniu od razu */
           }
         }
         const uob = document.getElementById('ust-ob');
