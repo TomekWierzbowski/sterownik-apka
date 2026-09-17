@@ -1266,14 +1266,19 @@
       const gl = 'apka ' + (window.APKA_WERSJA || '?')
                + ' | serwery: ' + POL.map(x => (x.nr || 1) + ':' + ((x.stan && x.stan.stan) || '?')).join(' ')
                + ' | obiekt ' + wybrany;
+      /*  ⚠ Znak nowej linii składamy z kodu, nie z literału [D-408a]: zapis `'\n'` w napisie
+          padł ofiarą narzędzia, którym wstawiałem tę łatkę — ukośnik zniknął, w pliku został
+          PRAWDZIWY przełam wiersza w środku napisu i CAŁY skrypt przestał się wykonywać.
+          Objaw był mylący: apka pokazywała dane demonstracyjne i nie otwierała ustawień,
+          bo nie wykonał się żaden kod, nie tylko ta funkcja. `String.fromCharCode(10)` jest
+          odporny na taką pomyłkę i tak samo robi to reszta tego pliku. */
+      const NL = String.fromCharCode(10);
+      const dwa = n2 => (n2 < 10 ? '0' : '') + n2;
       const tresc = pelny
-        ? gl + '
-' + M.dziennik.map(w => {
+        ? gl + NL + M.dziennik.map(w => {
             const d = new Date(w.t);
-            const dwa = n2 => (n2 < 10 ? '0' : '') + n2;
             return dwa(d.getHours()) + ':' + dwa(d.getMinutes()) + ':' + dwa(d.getSeconds()) + ' ' + w.txt;
-          }).join('
-')
+          }).join(NL)
         : gl;
       try {
         const m = new Paho.Message(tresc); m.destinationName = wybrany + '/apka'; m.qos = 0;
