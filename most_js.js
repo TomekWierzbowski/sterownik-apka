@@ -686,7 +686,10 @@
                                  broker jest". Zrodlo to ten sam ptaszek z logowania, ktory wyznacza zakres
                                  tematow [D-312], wiec nie ma drugiej prawdy o tym, kim jest patrzacy. */
                              serwis: !!serwisowe,
-                             brokery: POL.map(c => ({ nr: c.nr, host: c.host, user: c.user, temat: c.temat, stan: c.stan.stan, opis: c.stan.opis, niesie: klDla(wybrany) === c })),
+                             /*  [D-425] `slot` = numer slotu STEROWNIKA dla tej drogi (z tematu `serwery`,
+                                 pole `ja`). Ekran nazywa wiersze „slot 1/2", wiec musi znac numer, ktorym
+                                 posluguje sie sterownik - a nie kolejnosc na naszej liscie polaczen. */
+                             brokery: POL.map(c => ({ nr: c.nr, slot: c.slot || 0, host: c.host, user: c.user, temat: c.temat, stan: c.stan.stan, opis: c.stan.opis, niesie: klDla(wybrany) === c })),
                              wydawcy: wydawcy(), ost: ost, dziennik: M.dziennik, wersja: window.APKA_WERSJA || '',
                              lacze: czekamPoPowrocie || broker.stan !== 'ok',
                              blad: (broker.stan === 'ok' || broker.stan === 'laczy') ? null : broker.opis }); };

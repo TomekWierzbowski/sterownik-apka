@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'fb21c93c01';
+window.APKA_WERSJA = '219d331da6';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 22:28';
+window.HMI_ZBUDOWANO = '2026-09-17 22:37';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5842,7 +5842,8 @@ window.HMI_ZBUDOWANO = '2026-09-17 22:28';
                 + (_pwa ? '<a href="index.html?login=1" style="display:inline-block;margin-top:12px;padding:10px 16px;border-radius:10px;background:#1e6fd9;color:#fff;text-decoration:none;font-weight:600">Zmień sterownik / hasło</a>' : '')
               + '</div>'
               + '<div id="ust-brokery" hidden style="flex:0 0 auto"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
-                + '<div id="ust-brokery-l"></div></div>'
+                + '<div id="ust-brokery-l"></div>'
+                + '<div style="font-size:11px;color:#8d949e;margin-top:6px">Sterownik ma <b>dwa sloty</b>: slot 1 to nasz Mosquitto, a o slot 2 konkurują <b>dwie rezerwy</b> u różnych dostawców — automat sprawdza je co tydzień i wstawia tę, która żyje. Aplikacja słucha wszystkich trzech, żeby nie przegapić zamiany.</div></div>'
               /*  REZERWA STEROWNIKA [D-412] - TYLKO SERWIS. Sterownik trzyma u siebie trzeci adres
                   (rezerwe), ktory sam wstawia na miejsce zapasu, gdy ten zamilknie [D-383]. Dotad
                   zmienialo sie to wylacznie przy sterowniku; teraz widac to i zmienia sie stad.
@@ -6028,11 +6029,33 @@ window.HMI_ZBUDOWANO = '2026-09-17 22:28';
           const br = d.brokery || [];
           ubl.hidden = br.length < 2 || !serwisowy;
           if (br.length >= 2) {
-            const html = br.map(x => '<div style="margin-bottom:6px">'
-              + '<span style="color:' + (x.stan === 'ok' ? KOL.ok : x.stan === 'laczy' ? KOL.czekam : KOL.zle) + '">&#9679;</span> '
-              + '<b>serwer ' + x.nr + '</b>' + (x.niesie ? ' <span style="color:#9fd3ff">← tym nadaje wybrany obiekt</span>' : '')
-              + '<div style="color:#98a0ad;font-size:12px">' + x.host + ' · ' + x.user + ' · ' + x.temat + '</div>'
-              + '<div style="color:#d0d4da;font-size:12px">' + x.opis + '</div></div>').join('');
+            /*  JEDEN WIERSZ NA SERWER, DWA ZDANIA: osobno APKA, osobno STEROWNIK [D-425].
+                Rozjazd („telefon slucha tam, gdzie sterownik nie nadaje") widac wtedy od razu,
+                bez skladania dwoch list w glowie. */
+            const sp = (window.MOST_JS && window.MOST_JS.rezerwa && window.MOST_JS.rezerwa.spis()) || null;
+            const NAZWY = { 1: 'slot 1 — nasz Mosquitto', 2: 'rezerwa 1', 3: 'rezerwa 2' };
+            const ZAPST = ['nie sprawdzana', 'żywa', 'nie odpowiada', 'nie ustawiona'];
+            const opisSter = nr => {
+              if (!sp) return '';
+              if (nr === 3) { const z = sp.zapas2 || {};
+                return z.host ? 'sterownik: czeka poza slotem — sprawdzana co tydzień (' + (ZAPST[z.stan] || '?') + ')'
+                              : 'sterownik: drugiej rezerwy nie ma'; }
+              const w = nr === 1 ? sp.glowny : sp.zapas1;
+              if (!w || !w.host) return 'sterownik: slot pusty';
+              if (!w.wl) return 'sterownik: slot wyłączony';
+              const gdzie = nr === 1 ? 'w slocie 1' : 'pracuje w slocie 2';
+              if (!w.pol) return 'sterownik: ' + gdzie + ', ale NIE POŁĄCZONY';
+              return 'sterownik: ' + gdzie + ', połączony' + (sp.niesie === nr ? ' i TĘDY nadaje' : '');
+            };
+            const html = br.map(x => { const nr = x.slot || x.nr;
+              const kol = x.stan === 'ok' ? KOL.ok : x.stan === 'laczy' ? KOL.czekam : KOL.zle;
+              const ster = opisSter(nr);
+              return '<div style="margin-bottom:8px;word-break:break-all">'
+                + '<span style="color:' + kol + '">&#9679;</span> <b>' + (NAZWY[nr] || ('serwer ' + x.nr)) + '</b>'
+                + '<div style="color:#98a0ad;font-size:12px">' + x.host + ' · ' + x.user + '</div>'
+                + '<div style="color:#d0d4da;font-size:12px">apka: ' + x.opis + '</div>'
+                + (ster ? '<div style="font-size:12px;color:' + (sp && sp.niesie === nr ? '#9fd3ff' : '#98a0ad') + '">' + ster + '</div>' : '')
+                + '</div>'; }).join('');
             if (ublL._html !== html) { ublL._html = html; ublL.innerHTML = html; }
           }
         }
@@ -6068,14 +6091,13 @@ window.HMI_ZBUDOWANO = '2026-09-17 22:28';
           const ZAP_STAN = ['nie sprawdzana', 'żywa', 'nie odpowiada', 'nie ustawiona'];
           const st = document.getElementById('ust-rez-stan');
           if (st) {
+            /*  ⚠ TU JUZ NIE POWTARZAMY CALEJ LISTY [D-425] - ona jest wyzej, w jednym miejscu,
+                razem ze stanem apki. Zostaje to, czego tamta lista nie powie: co siedzi w rezerwie.
+                [D-414] `dubel` liczy STEROWNIK, nie apka - inaczej most, apka i webhmi porownywalyby
+                adresy kazde po swojemu i rozjezdzaly sie w tym, co pokazuja. */
             const html = sp
-              ? wiersz('główny', sp.glowny, sp.niesie === 1 ? '<div style="color:#9fd3ff">← tym nadaje</div>' : '')
-                + wiersz('zapas', sp.zapas1, sp.niesie === 2 ? '<div style="color:#9fd3ff">← tym nadaje</div>' : '')
-                /*  [D-414] REZERWA NA TYM SAMYM BROKERZE CO ZAPAS TO NIE JEST DROGA ZAPASOWA.
-                    Liczy to STEROWNIK (pole `dubel` w spisie), nie apka - inaczej most, apka i webhmi
-                    porownywalyby adresy kazde po swojemu i rozjezdzaly sie w tym, co pokazuja. */
-                + wiersz('rezerwa', sp.zapas2, ' <span style="color:#8d949e">· ' + (ZAP_STAN[sp.zapas2 && sp.zapas2.stan] || '?') + '</span>'
-                    + (sp.dubel ? ' <span style="color:#d08b5b">· to ten sam broker co zapas — padnie razem z nim</span>' : ''))
+              ? wiersz('rezerwa', sp.zapas2, ' <span style="color:#8d949e">· ' + (ZAP_STAN[sp.zapas2 && sp.zapas2.stan] || '?') + '</span>'
+                    + (sp.dubel ? '<div style="color:#d08b5b">to ten sam broker co slot 2 — padnie razem z nim</div>' : ''))
               : '<div style="color:#8d949e">sterownik jeszcze nie podał spisu serwerów</div>';
             if (st._html !== html) { st._html = html; st.innerHTML = html; }
           }
