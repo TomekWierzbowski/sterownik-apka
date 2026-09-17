@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'b1334f0212';
+window.APKA_WERSJA = 'fb21c93c01';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 21:14';
+window.HMI_ZBUDOWANO = '2026-09-17 22:28';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -6055,7 +6055,12 @@ window.HMI_ZBUDOWANO = '2026-09-17 21:14';
           const sp = R && R.spis();
           const wiersz = (nazwa, w, dopisek) => {
             if (!w || !w.host) return '<div style="margin-bottom:4px"><b>' + nazwa + '</b> <span style="color:#8d949e">— nie ustawiony</span></div>';
-            return '<div style="margin-bottom:4px"><b>' + nazwa + '</b> <span style="color:#d0d4da">' + w.host + ':' + w.port + '</span>'
+            /*  ⚠ DLUGI ADRES CHMUROWY WYPYCHAL DOPISEK POZA EKRAN [Tomasz 17.09: „w rezerwa
+                sterownika uciete «w tym nadaje»"]. Adres HiveMQ ma 50 znakow i w jednej linii
+                z telefonem nie ma szans. `word-break` pozwala go zlamac, a dopisek „tym nadaje"
+                dostaje wlasna linie - to najwazniejsza informacja w tym wierszu, wiec nie moze
+                byc tym, co znika pierwsze. */
+            return '<div style="margin-bottom:6px;word-break:break-all"><b>' + nazwa + '</b> <span style="color:#d0d4da">' + w.host + ':' + w.port + '</span>'
                  + (w.tls ? ' <span style="color:#8d949e">szyfrowane</span>' : ' <span style="color:#d08b5b">gołe</span>')
                  + (w.lan ? ' <span style="color:#8d949e">· adres domowy (telefon w drodze go nie użyje)</span>' : '')
                  + (dopisek || '') + '</div>';
@@ -6064,8 +6069,8 @@ window.HMI_ZBUDOWANO = '2026-09-17 21:14';
           const st = document.getElementById('ust-rez-stan');
           if (st) {
             const html = sp
-              ? wiersz('główny', sp.glowny, sp.niesie === 1 ? ' <span style="color:#9fd3ff">← tym nadaje</span>' : '')
-                + wiersz('zapas', sp.zapas1, sp.niesie === 2 ? ' <span style="color:#9fd3ff">← tym nadaje</span>' : '')
+              ? wiersz('główny', sp.glowny, sp.niesie === 1 ? '<div style="color:#9fd3ff">← tym nadaje</div>' : '')
+                + wiersz('zapas', sp.zapas1, sp.niesie === 2 ? '<div style="color:#9fd3ff">← tym nadaje</div>' : '')
                 /*  [D-414] REZERWA NA TYM SAMYM BROKERZE CO ZAPAS TO NIE JEST DROGA ZAPASOWA.
                     Liczy to STEROWNIK (pole `dubel` w spisie), nie apka - inaczej most, apka i webhmi
                     porownywalyby adresy kazde po swojemu i rozjezdzaly sie w tym, co pokazuja. */

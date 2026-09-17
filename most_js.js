@@ -897,6 +897,14 @@
       let tresc = String(v);
       if (typeof v === 'number') {                     /* dopisek tylko przy tempie, nie przy „pelny"/„okres:" */
         const nr = (niesie === undefined) ? niesieNr() : niesie;
+        /*  ⛔ PROSBA `niesie=N` JEST OBIETNICA, ZE NA TEJ DRODZE SLUCHAMY  [D-424, trop Tomasza]
+            Apka odpina ciezkie tematy od drogi nadmiarowej [D-315]. Gdy obiekt pozniej „przejdzie"
+            na te wlasnie droge, prosilismy sterownik, zeby nadawal ciezkie WLASNIE TAM - a tam
+            mielismy je odpiete. Sterownik slucha i przestaje wysylac gdziekolwiek indziej, wiec
+            nikt nie dostaje ani bloku, ani zmian. `status` i `stan` sa lekkie i ida dalej, wiec
+            wszystko wyglada zdrowo - tylko ekran stoi na „pobieram stan…". */
+        if (nr) { const cel = POL.find(x => (x.slot || 0) === nr);
+                  if (cel && cel.lekki) { wepnijCiezkie(cel); cel.bliz = 0; } }
         tresc += ';niesie=' + nr;
         if (nr !== niesieOst) { niesieOst = nr; zapisz(nr ? 'proszę o ciężkie tematy serwerem ' + nr : 'proszę o ciężkie tematy OBOMA serwerami'); }
       }
