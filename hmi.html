@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '82ec0fb6be';
+window.APKA_WERSJA = '9c10405020';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 16:07';
+window.HMI_ZBUDOWANO = '2026-09-17 21:14';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5832,20 +5832,23 @@ window.HMI_ZBUDOWANO = '2026-09-17 16:07';
           u.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #2a2e35;flex:0 0 auto">'
               + '<b style="font-size:16px;letter-spacing:.02em">USTAWIENIA</b>'
               + '<span id="ust-zamknij" style="margin-left:auto;cursor:pointer;font-size:22px;line-height:1;padding:0 6px">&#10005;</span></div>'
-            + '<div style="overflow:auto;padding:14px;display:flex;flex-direction:column;gap:18px">'
+            /*  [D-419a] `align-items:stretch` + sekcje `flex:0 0 auto` (nizej): kontener jest
+                  kolumna elastyczna, wiec bez tego dzieci DZIELA sie wysokoscia i ta na koncu
+                  dostaje resztki. Przewijanie ma byc TYLKO tutaj. */
+            + '<div style="overflow-y:auto;overflow-x:hidden;padding:14px;display:flex;flex-direction:column;gap:18px;flex:1 1 auto;min-height:0">'
               + '<div><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">POŁĄCZENIE</div>'
                 + '<div id="ust-st" style="margin-bottom:4px"></div><div id="ust-br" style="margin-bottom:4px"></div>'
                 + '<div id="ust-ob" style="color:#d0d4da"></div>'
                 + (_pwa ? '<a href="index.html?login=1" style="display:inline-block;margin-top:12px;padding:10px 16px;border-radius:10px;background:#1e6fd9;color:#fff;text-decoration:none;font-weight:600">Zmień sterownik / hasło</a>' : '')
               + '</div>'
-              + '<div id="ust-brokery" hidden><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
+              + '<div id="ust-brokery" hidden style="flex:0 0 auto"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
                 + '<div id="ust-brokery-l"></div></div>'
               /*  REZERWA STEROWNIKA [D-412] - TYLKO SERWIS. Sterownik trzyma u siebie trzeci adres
                   (rezerwe), ktory sam wstawia na miejsce zapasu, gdy ten zamilknie [D-383]. Dotad
                   zmienialo sie to wylacznie przy sterowniku; teraz widac to i zmienia sie stad.
                   ⚠ Uklad pol odpowiada gramatyce rozkazu sterownika (adres, port, uzytkownik, haslo) -
                     nie wymyslamy wlasnej kolejnosci, zeby serwis czytal jedno i to samo w obu miejscach. */
-              + '<div id="ust-rezerwa" hidden><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">REZERWA STEROWNIKA</div>'
+              + '<div id="ust-rezerwa" hidden style="flex:0 0 auto"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">REZERWA STEROWNIKA</div>'
                 + '<div id="ust-rez-stan" style="margin-bottom:8px"></div>'
                 + '<div style="display:flex;flex-direction:column;gap:7px">'
                   + '<div style="display:flex;gap:7px"><input id="ust-rez-host" placeholder="adres brokera rezerwowego" autocapitalize="off" autocorrect="off" spellcheck="false" style="' + STYL_POLE + ';flex:1 1 auto">'
@@ -5865,10 +5868,18 @@ window.HMI_ZBUDOWANO = '2026-09-17 16:07';
                   + '<div id="ust-rez-tls" style="font-size:11px;color:#8d949e"></div>'
                   + '<div style="font-size:11px;color:#8d949e">Zmiana wymaga PIN-u serwisowego sterownika. Hasło jedzie do sterownika, a nie do aplikacji — nie zobaczysz go tu z powrotem.</div>'
                 + '</div></div>'
-              + '<div id="ust-czasy"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
+              + '<div id="ust-czasy" style="flex:0 0 auto"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">CZASY</div>'
                 + '<span id="chmura-w" style="font-size:12px;color:#98a0ad"></span></div>'
-              + '<div id="ust-dziennik" style="display:flex;flex-direction:column;min-height:0"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
-                + '<pre id="chmura-dz" style="margin:0;max-height:46vh;overflow:auto;font:11px/1.4 ui-monospace,monospace;color:#d0d4da;white-space:pre-wrap;background:#0f1114;border-radius:6px;padding:8px"></pre></div>'
+              /*  ⛔ DZIENNIK PRZEWIJA SIE Z CALYM OKNEM, NIE WE WLASNYM OKIENKU  [D-419a, uwaga
+                  Tomasza 17.09: „na dole widac tylko skrawek logow, nie da sie przewinac"].
+                  Byly tu DWA przewijania jedno w drugim (okno i `max-height:46vh` na dzienniku)
+                  oraz `flex-direction:column` z `min-height:0`, ktore POZWALA sie sekcji skurczyc.
+                  Po dolozeniu sekcji REZERWA [D-412] na dziennik zostawalo kilka pikseli, a palec
+                  na telefonie trafial w przewijanie RODZICA - wiec skrawka nie dalo sie przesunac.
+                  Teraz: sekcje maja stala wysokosc tresci (`flex:0 0 auto`), dziennik nie ma wlasnego
+                  ograniczenia i przewija sie razem z oknem. Jedno przewijanie = palec zawsze trafia. */
+              + '<div id="ust-dziennik" style="flex:0 0 auto"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">DZIENNIK ŁĄCZA</div>'
+                + '<pre id="chmura-dz" style="margin:0;font:11px/1.4 ui-monospace,monospace;color:#d0d4da;white-space:pre-wrap;background:#0f1114;border-radius:6px;padding:8px"></pre></div>'
             + '</div>';
           document.body.appendChild(u);
           /* dziennik wypełniamy OD RAZU po otwarciu - inaczej sekcja stała pusta do następnego pakietu */

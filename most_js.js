@@ -693,6 +693,9 @@
     /* ostatnio wybrany obiekt pamietany w telefonie - przy dwu obiektach apka otwiera ten, na ktory patrzono */
     const pamiec = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
     let wybrany = o.obiekt || pamiec('mqtt_obiekt') || null;
+    /*  [D-419] Czy wybor jest CZLOWIEKA (z adresu, z pamieci telefonu albo z listy na pasku),
+        czy nasz - automatyczny. Tylko ten drugi wolno nam zmienic, gdy obiekt okaze sie martwy. */
+    let wybranyRecznie = !!wybrany;
     const cid = 'hmi-' + Math.random().toString(16).slice(2, 10);
     /*  UCHWYT DO GNIAZDA [D-310]: Paho nie udostępnia swojego WebSocketa, a po odmrożeniu karty trzeba móc zamknąć
         gniazdo, które zostało „w locie" - inaczej `connect()` odbija się aż do jego własnego limitu czasu (10 s),
@@ -1127,7 +1130,18 @@
           return;
         }
       }
-      obiekty[pref] = Object.assign(obiekty[pref] || {}, { kiedy: Date.now(), kl: _zrodlo });   // status z `status` zostaje; `kl` = broker, którym przyszedł [D-313]
+      /*  ⛔ ZASTANY BLOK NIE USTANAWIA, KTO NIESIE OBIEKT  [D-419b, objaw Tomasza: „basen sie
+          polaczyl, ale niekompletny, jakby demo"]
+          `kl` mowi, ktora droga obiekt NADAJE - stad ida zadania i komendy. Ustawialismy go przy
+          KAZDYM pelnym bloku, takze `retained`. A retained lezy na brokerze i po zmianie ukladu
+          potrafi byc sprzed godzin: na EMQX (dzis REZERWA, wiec sterownik tam nic nie nadaje)
+          lezal caly stary komplet `blok`/`opis`/`status`. Apka brala go za biezacy stan i kierowala
+          zadania w martwa droge - ekran mial liczby, ale nieruchome, jak demo.
+          ⚠ Zasada: SWIEZE WYGRYWA NAD ZASTANYM. Zastany blok wolno przyjac jako zasiew lustra
+            (to robi `zastosujPelny` nizej), ale nie wolno mu przestawiac drogi. */
+      const _byl = obiekty[pref] && obiekty[pref].kl;
+      obiekty[pref] = Object.assign(obiekty[pref] || {}, { kiedy: Date.now() },
+                                    (m.retained && _byl) ? {} : { kl: _zrodlo });   // `kl` = broker, którym przyszedł [D-313]
       zastosujPelny(pref, obiekty[pref], m.payloadString);
       /*  RETAINED = ZASIEW, NIE ŚWIEŻY STAN [D-280]: blok z flagą retained ma od 0 do 60 s. Zasiewa
           lustro (rejestry, seq), ale nie zdejmuje planszy - świeży pełny blok przychodzi po `zadanie`
@@ -1392,7 +1406,8 @@
       } catch (e) { return false; }
     };
 
-    M.wybierzObiekt = pref => { if (obiekty[pref]) { wybrany = pref; try { localStorage.setItem('mqtt_obiekt', pref); } catch (e) {} oglos(tempo); oddaj(true); } };
+    M.wybierzObiekt = pref => { if (obiekty[pref]) { wybrany = pref; wybranyRecznie = true;
+      try { localStorage.setItem('mqtt_obiekt', pref); } catch (e) {} oglos(tempo); oddaj(true); } };
     /*  SPRAWDŹ PIN [2026-09-09, Tomasz: „PIN do serwisu taki, jaki jest ustawiony w sterowniku"]:
         publikuje `pin=` bez `w=` (sterownik nic nie zapisuje, tylko odpowiada, czy PIN pasuje).
         Kod 0 → PIN dobry, zapamiętujemy go do kolejnych zmian serwisowych (bez pytania drugi raz).
@@ -1541,7 +1556,24 @@
         (w0.statusy || (w0.statusy = {}))[_zrodlo.nr] = st;
         const lista = Object.values(w0.statusy);
         w0.status = lista.indexOf('online') >= 0 ? 'online' : (lista.indexOf('offline') >= 0 ? 'offline' : '?');
+        /*  ⛔ AUTOMATYCZNY WYBOR WOLI OBIEKT, KTORY ZYJE  [D-419, objaw Tomasza: „brak sterownika"
+            przy dzialajacym basenie - apka otwarla sadzawke, ktora wlasnie padla]
+            Dotad brany byl PIERWSZY obiekt, ktory ogłosil status, bez patrzenia, CO ten status mowi.
+            Przy zapamietanym wyborze to bez znaczenia, ale po wyczyszczeniu danych albo na nowym
+            telefonie decyduje kolejnosc pakietow retained - czyli nic sensownego. Czlowiek dostaje
+            martwy ekran i wnioskuje, ze nie dziala CALOSC, choc drugi obieg nadaje.
+            ⚠ TYLKO DOPOKI CZLOWIEK NIE WYBRAL SAM. Gdy wybral - recznie albo pamiecia telefonu -
+              nie ruszamy mu ekranu, nawet jesli ten obiekt padnie: wtedy „offline" jest wlasnie ta
+              informacja, po ktora siegnal. */
         if (!wybrany) { wybrany = pref; oglos(tempo); }
+        else if (!wybranyRecznie && st === 'online') {
+          const teraz = obiekty[wybrany];
+          if (teraz && teraz.status === 'offline' && pref !== wybrany) {
+            zapisz('obiekt ' + wybrany.split('/').slice(1).join('/') + ' jest offline - pokazuje '
+                   + pref.split('/').slice(1).join('/') + ', ktory nadaje');
+            wybrany = pref; oglos(tempo);
+          }
+        }
         oddaj(); return;
       }
       _onMsg(m);
