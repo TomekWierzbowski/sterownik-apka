@@ -633,6 +633,7 @@
     const zdarzenia = {};               /* prefiks -> {ile, zgubione, wpisy[[czas,kat,kod,zr,ob,a,b,c]]} [D-295] */
     let czekaPliki = null, czekaPlik = null;                      /* prośby o listę / plik z karty SD [D-297] */
     let czekaZapas = null;                                        /* [D-412] kto czeka na meldunek o rezerwie */
+    const _spisy = {};                                            /* [D-426a] spis serwerow PER OBIEG */
     /*  PROSBA O OKRES - OSOBNA NA KAZDA KATEGORIE [D-348, 2026-09-12]
         ------------------------------------------------------------
         WEJSCIA:  zadania `/okres?kat=zdarzenia` i `/okres?kat=alarmy`; odpowiedzi z tematu `okres`.
@@ -909,7 +910,8 @@
         if (nr) { const cel = POL.find(x => (x.slot || 0) === nr);
                   if (cel && cel.lekki) { wepnijCiezkie(cel); cel.bliz = 0; } }
         tresc += ';niesie=' + nr;
-        if (nr !== niesieOst) { niesieOst = nr; zapisz(nr ? 'proszę o ciężkie tematy serwerem ' + nr : 'proszę o ciężkie tematy OBOMA serwerami'); }
+        if (nr !== niesieOst) { niesieOst = nr;
+          zapisz(nr ? 'proszę o ciężkie tematy przez ' + NAZWA_DROGI(nr) : 'proszę o ciężkie tematy WSZYSTKIMI drogami'); }
       }
       /*  ŻĄDANIE IDZIE WSZYSTKIMI DROGAMI [D-327, uwaga z audytu]: dotąd szło tylko tą, którą uważamy
           za niosącą. Gdy sterownik straci WŁAŚNIE tego brokera, prośba leci w próżnię, a sterownik
@@ -1023,7 +1025,7 @@
         try { const s = JSON.parse(m.payloadString); if (s && s.czas) zegar[cz.slice(0, -1).join('/')] = { czas: s.czas, kiedy: Date.now() }; } catch (e) {}
         return;
       }
-      if (rodzaj === 'serwery') { spisSerwerow(m.payloadString); return; }   /* [D-411] */
+      if (rodzaj === 'serwery') { spisSerwerow(m.payloadString, cz.slice(0, -1).join('/')); return; }   /* [D-411] */
       if (rodzaj === 'zapas') {                     /* [D-412] meldunek sterownika o rezerwie */
         const pref = cz.slice(0, -1).join('/');
         const txt = m.payloadString || '';
@@ -1214,7 +1216,13 @@
         oszczedzanie baterii oraz niedobijanie brokera - tam zostaja stare odstepy.
         ⚠ Brokera i tak nie dobijemy: `polaczTeraz` pilnuje 1,5 s miedzy probami niezaleznie od tego. */
     const ODSTEPY_PATRZY = [1, 2, 3, 5];
-    const etyk = c => (POL.length > 1 ? 'serwer ' + c.nr + ': ' : '');
+    /*  [D-427a] JEDNA NAZWA DROGI dla dziennika i dla ekranu. `slot` to numer slotu STEROWNIKA
+        (z tematu `serwery`), a gdy go jeszcze nie znamy - pozycja na naszej liscie polaczen.
+        Trzeci adres nie jest „slotem 3": to drugi kandydat do slotu 2. */
+    const NAZWA_DROGI = nr => (nr === 1 ? 'slot 1' : nr === 2 ? 'slot 2 serwer 1'
+                               : nr === 3 ? 'slot 2 serwer 2' : 'droga ' + nr);
+    M.nazwaDrogi = NAZWA_DROGI;
+    const etyk = c => (POL.length > 1 ? NAZWA_DROGI(c.slot || c.nr) + ': ' : '');
     /*  Komplet tematów obiektu; qos 1 tam, gdzie zgubiona wiadomość to zgubiona odpowiedź (paczki zmian,
         dziennik, karta SD), qos 0 tam, gdzie i tak przyjdzie następna (blok, stan, status, wynik). */
     const TEMATY = [['blok', 0], ['zm', 1], ['status', 0], ['wynik', 0], ['stan', 0],
@@ -1441,6 +1449,7 @@
     };
 
     M.wybierzObiekt = pref => { if (obiekty[pref]) { wybrany = pref; wybranyRecznie = true;
+      M.ostSpisSerwerow = _spisy[pref] || null;   /* [D-426a] spis idzie za wybranym obiegiem */
       try { localStorage.setItem('mqtt_obiekt', pref); } catch (e) {} oglos(tempo); oddaj(true); } };
     /*  SPRAWDŹ PIN [2026-09-09, Tomasz: „PIN do serwisu taki, jaki jest ustawiony w sterowniku"]:
         publikuje `pin=` bez `w=` (sterownik nic nie zapisuje, tylko odpowiada, czy PIN pasuje).
@@ -1674,10 +1683,14 @@
         ma w sterowniku 1 do 1"]. Recznie wpisany zapas jest ziarnem na czas, zanim sterownik sie
         odezwie; potem obowiazuje to, co on mowi. Kazda taka zmiana idzie do dziennika lacza, zeby
         nie byla cicha. */
-    const spisSerwerow = tekst => {
+    const spisSerwerow = (tekst, pref) => {
       let s = null; try { s = JSON.parse(tekst); } catch (e) { return; }
       if (!s) return;
-      M.ostSpisSerwerow = s;                  /* do podgladu w serwisie: komplet, takze adresy domowe */
+      /*  ⛔ SPIS JEST WLASNOSCIA OBIEGU, NIE APKI [D-426a]. Jedno wspolne pole znaczylo, ze ekran
+          basenu pokazywal spis sadzawki - ten, ktory przyszedl ostatni. Konto serwisowe oglada
+          kilka obiegow naraz, wiec to nie jest przypadek brzegowy, tylko codziennosc. */
+      _spisy[pref] = s;
+      if (pref === wybrany) M.ostSpisSerwerow = s;   /* do podgladu w serwisie i na ekranie */
       /*  ⚠ ZASTANY SPIS BYWA SPRZED ZMIANY FIRMWARE [D-426]. Gdy brakuje w nim pola, ktorego
           potrzebujemy do opisania slotow (`pol` = czy sterownik ma tam polaczenie), prosimy
           sterownik o swiezy - raz, zeby nie robic z tego petli. Milczenie o stanie slotu jest
