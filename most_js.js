@@ -872,6 +872,23 @@
         /* [D-354] czlowiek wrocil i czeka - jesli poprzednie proby padly, nie reanimujemy, tylko budujemy od zera */
         if (c.stan.stan === 'blad' || c.byloZerwane) odnowKlienta(c);
         c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('powrót na ekran'); }); oddaj(); }
+      /*  ⚠ POŁĄCZENIE, KTÓRE TWIERDZI, ŻE ŻYJE, A MILCZY — NIE CZEKAJ NA STRAŻNIKA [D-409,
+          Tomasz 17.09: „wraca po zmianie okna już dłużej niż się uruchomił"].
+          Powyższa pętla naprawia tylko te drogi, które SAME przyznają się, że padły. Gniazdo
+          zamrożone razem z kartą nadal zgłasza gotowość, więc trafiało pod strażnika ciszy —
+          a ten czeka 75 s. Efekt był absurdalny: powrót na ekran trwał dłużej niż uruchomienie
+          apki od zera (~3 s), bo świeży start buduje klienta od razu.
+          75 s zostaje dla PRACY W TLE (nie dobijamy brokera, gdy nikt nie patrzy), ale gdy człowiek
+          wrócił i patrzy — 8 s ciszy wystarczy za dowód. Sterownik nadaje co 5 s, więc ośmiu sekund
+          nie da się pomylić z normalną pracą. */
+      const TERAZ = Date.now();
+      POL.filter(c => c.kl.isConnected() && c.ostOdbior && (TERAZ - c.ostOdbior) > 8000).forEach(c => {
+        zapisz(etyk(c) + 'powrót na ekran, a cisza ' + Math.round((TERAZ - c.ostOdbior) / 1000)
+               + ' s mimo „połączony" - buduję klienta od nowa, zamiast czekać na strażnika');
+        odnowKlienta(c);
+        c.stan = { stan: 'laczy', opis: 'łączę ponownie…' }; c.odstepNr = 0; c.polaczTeraz('powrót - martwe gniazdo');
+      });
+      oddaj();
       if (POL.some(c => c.kl.isConnected())) oglosTeraz();
     });
     window.addEventListener('focus', oglosTeraz);
