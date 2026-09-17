@@ -759,8 +759,19 @@
         TERAZ: pusty napis znaczy to samo co brak pola - wstawiamy adres wbudowany. Kto naprawde chce
         jednego serwera, po prostu nie dostanie na drugim konta: proba konczy sie odmowa CONNACK,
         pierwszy broker dziala dalej, a w dzienniku lacza widac dlaczego. To jest tansze niz cisza. */
-    const HOST2_WBUDOWANY = 'i15560b1.ala.us-east-1.emqxsl.com';
-    const _host2 = (o.host2 !== undefined && o.host2 !== null && o.host2 !== '') ? o.host2 : HOST2_WBUDOWANY;
+    /*  ⚠ SPROSTOWANIE DO SPROSTOWANIA [D-410, 17.09] — ADRES WBUDOWANY USUNIĘTY.
+        D-373 (wyżej) kazało podstawiać wbudowany adres, bo pusty napis nie dawał się odróżnić od
+        „nigdy nie ustawione", a apka siedziała cicho na ŻYWYM, ale PUSTYM brokerze. Powód był dobry,
+        ale lekarstwo okazało się gorsze: 17.09 telefon Tomasza wskazywał brokera, na którym NIE MA
+        KONTA apki — i apka co dwie sekundy budowała klienta od nowa, przy okazji zrywając połączenie,
+        które DZIAŁAŁO („serwer 1: połączony ponownie, przerwa 4 s"), a obiegi znikały z ekranu.
+        ⚠ Rozstrzygnięcie nie brzmi „zgadywać czy nie zgadywać": REZERWA MA POCHODZIĆ ZE STEROWNIKA,
+        a nie ze stałej w kodzie apki. Brak rezerwy = brak rezerwy, ale POWIEDZIANY wprost
+        (`rezerwaBrak` niżej), a nie zastąpiony zgadywanką ani przemilczany. To godzi obie lekcje:
+        nie ma cichego siedzenia na pustym brokerze i nie ma burzy ponowień na cudzym.
+        ⚠ Ponawianie i tak jest dziś odporne [D-407]: odstęp rośnie, a martwa droga nie każe
+        sterownikowi wracać do nadawania oboma. Ale to zabezpieczenie, nie powód, żeby zgadywać. */
+    const _host2 = (o.host2 || '').trim();
     const _user2 = o.user2 || (o.user ? o.user + '2' : '');
     const _pass2 = o.pass2 || o.pass;
     if (_host2 && _user2) { const a2 = adres(_host2, o.port2);
@@ -771,6 +782,19 @@
           dowolna; `temat2` zostaje furtką, gdyby kiedyś prefiks naprawdę się różnił. */
       POL.push({ nr: 2, host: a2.host, port: a2.port, user: _user2, pass: _pass2,
                  temat: o.temat2 || o.temat }); }
+    /*  [D-410] DRUGA REZERWA — sterownik wybiera JEDNĄ z dwóch kandydatek [D-383] i apka nie wie,
+        którą akurat wziął. Dlatego słucha obu: obiekt pokaże się niezależnie od tego, przez którą
+        nadaje. Konto i hasło jak przy pierwszej rezerwie; zakres tematów ZAWSZE z konta głównego
+        (ta sama zasada co w D-316 — to ten sam obiekt, różnią się tylko konta u dostawców). */
+    const _host3 = (o.host3 || '').trim();
+    const _user3 = o.user3 || (o.user ? o.user + '3' : '');
+    const _pass3 = o.pass3 || o.pass;
+    if (_host3 && _user3) { const a3 = adres(_host3, o.port3);
+      POL.push({ nr: 3, host: a3.host, port: a3.port, user: _user3, pass: _pass3,
+                 temat: o.temat3 || o.temat }); }
+    /*  ⚠ „REZERWY NIE MA" MÓWIMY WPROST (zasada 10) — to jest właśnie ta luka, przez którą D-373
+        kazało zgadywać adres. Widoczny stan zamiast ciszy albo zgadywanki. */
+    M.rezerwaBrak = (POL.length < 2);
     POL.forEach((c, i) => { c.kl = new Klient(c.host, c.port, '/mqtt', cid + (i ? '-' + (i + 1) : ''));
                             c.stan = { stan: 'laczy', opis: 'łączę z brokerem…' }; });
     /*  ILE BROKEROW NAPRAWDE MAMY - WPROST W DZIENNIKU [D-353, 2026-09-13]

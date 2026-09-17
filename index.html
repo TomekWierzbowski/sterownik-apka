@@ -53,17 +53,23 @@
       broker <b>rozróżnia wielkie i małe litery</b>, więc nazwę konta trzeba wpisać dokładnie tak, jak ją dostałeś.</p>
       <label class="zapam" style="margin-top:10px"><input type="checkbox" id="serw"> konto serwisowe — widzę wszystkie sterowniki</label>
       <p class="mala">Zaznacz TYLKO na własnym telefonie. Konto klienta widzi jeden obiekt — ten, którego nazwę podał serwis.</p>
-      <b style="display:block;margin-top:14px">Drugi serwer (zapasowy)</b>
-      <p class="mala">Wypełnione fabrycznie — <b>nie trzeba tu nic zmieniać</b>. Sterownik nadaje przez dwa serwery:
-        własny (pierwszy) i zapasowy, który działa nawet wtedy, gdy sieć serwisu jest niedostępna.
-        Aplikacja słucha obu naraz i pokazuje obiekt niezależnie od tego, którym akurat nadaje.</p>
-      <label for="host2">Serwer 2</label>
-      <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = tylko pierwszy serwer">
+      <b style="display:block;margin-top:14px">Serwery zapasowe</b>
+      <p class="mala">Zwykle <b>puste — i tak ma być</b>. Sterownik sam wybiera jeden serwer zapasowy spośród
+        wpisanych mu w menu serwisowym; aplikacja nie zgaduje adresów. Wypełnij tylko wtedy, gdy serwis
+        podał Ci gotowe dane — wpisanie adresu, na którym nie masz konta, pogarsza działanie.</p>
+      <label for="host2">Zapas 1</label>
+      <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = bez rezerwy">
       <p class="mala">Port dopisuje się po dwukropku, gdy jest inny niż zwykle: HiveMQ 8884, EMQX 8084 (dobieramy sam).</p>
-      <label for="user2">Użytkownik 2</label>
+      <label for="user2">Użytkownik zapasu 1</label>
       <input type="text" id="user2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = ten sam z dwójką na końcu">
-      <label for="pass2">Hasło 2</label>
+      <label for="pass2">Hasło zapasu 1</label>
       <input type="password" id="pass2" autocomplete="off" placeholder="pusto = to samo hasło">
+      <label for="host3">Zapas 2</label>
+      <input type="text" id="host3" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = bez drugiej rezerwy">
+      <label for="user3">Użytkownik zapasu 2</label>
+      <input type="text" id="user3" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = ten sam z trójką na końcu">
+      <label for="pass3">Hasło zapasu 2</label>
+      <input type="password" id="pass3" autocomplete="off" placeholder="pusto = to samo hasło">
     </details>
     <div class="zapam"><input type="checkbox" id="zap" checked><label for="zap" style="margin:0">zapamiętaj na tym telefonie</label></div>
     <div class="rz"><button type="submit" id="idz">Otwórz HMI</button></div>
@@ -100,9 +106,12 @@
   el('serw').checked = (z && z.serwis !== undefined) ? !!z.serwis : (!!el('user').value && el('user').value.indexOf('-') < 0);
   /* [D-317] drugi broker wypełnia się sam: adres z wbudowanej stałej, konto = to samo z dwójką, hasło to samo.
      Zapisane wcześniej wartości mają pierwszeństwo; pusty adres znaczy „tylko pierwszy serwer". */
-  el('host2').value = (z && z.host2 !== undefined) ? z.host2 : HOST2;
+  el('host2').value = (z && z.host2) || HOST2;   /* HOST2 jest dzis PUSTY - rezerwy nie zgadujemy [D-410] */
   el('user2').value = (z && z.user2) || '';
   el('pass2').value = (z && z.pass2) || '';
+  el('host3').value = (z && z.host3) || '';
+  el('user3').value = (z && z.user3) || '';
+  el('pass3').value = (z && z.pass3) || '';
   /*  [D-326] NAZWA PRZESTAJE NADPISYWAC RECZNIE WPISANEGO UZYTKOWNIKA. Konto serwisowe nazywa sie
       z wielkiej litery, a `slug()` robi z tego male litery - broker odpowiada wtedy „brak
       uprawnien" (sprawdzone na obu: HiveMQ i EMQX). Kto raz poprawi pole, ten wie, co robi. */
@@ -151,7 +160,8 @@
       stan.className = 'stan ' + (ok ? 'ok' : 'zle'); stan.textContent = txt;
       if (ok) { const serwis = el('serw').checked;
                 const host2 = el('host2').value.trim(), user2 = el('user2').value.trim(), pass2 = el('pass2').value;
-                const dane = { host, user, pass, nazwa, serwis, host2, user2, pass2 };
+                const host3 = el('host3').value.trim(), user3 = el('user3').value.trim(), pass3 = el('pass3').value;
+                const dane = { host, user, pass, nazwa, serwis, host2, user2, pass2, host3, user3, pass3 };
                 try { if (el('zap').checked) localStorage.setItem('odbior_mqtt', JSON.stringify(dane));
                       else sessionStorage.setItem('odbior_mqtt_tmp', JSON.stringify(dane)); } catch(e){}
                 setTimeout(() => location.href = 'hmi.html?mqtt=1', 400); } };

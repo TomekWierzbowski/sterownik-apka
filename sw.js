@@ -2,7 +2,7 @@
    żeby HMI otwierało się od razu i bez zasięgu (dane z brokera i tak wymagają sieci -
    bez niej ekran pokazuje ostatni stan z napisem „czekam na pakiet”). Nowa wersja
    plików = nowa nazwa pamięci (WERSJA z odcisku treści) -> stare kopie znikają. */
-const WERSJA = 'basen-hmi-59f68d533d';
+const WERSJA = 'basen-hmi-bb4a3c081c';
 const PLIKI = ['./', './index.html', './hmi.html', './most_js.js', './paho-mqtt.min.js',
                './manifest.webmanifest', './ikona-192.png', './ikona-512.png', './ikona-maskable-512.png'];
 self.addEventListener('install', e => {
