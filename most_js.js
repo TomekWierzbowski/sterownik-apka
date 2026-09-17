@@ -772,8 +772,18 @@
         nie ma cichego siedzenia na pustym brokerze i nie ma burzy ponowień na cudzym.
         ⚠ Ponawianie i tak jest dziś odporne [D-407]: odstęp rośnie, a martwa droga nie każe
         sterownikowi wracać do nadawania oboma. Ale to zabezpieczenie, nie powód, żeby zgadywać. */
+    /*  KONTA ZAPASOWE WYLICZANE Z LOGINU GLOWNEGO [D-415, zasada „z zerem" — patrz nizej].
+        `Master0` -> `Master` i `Master2`;  `klient` -> `klient2` i `klient3`.
+        Wpisane recznie pole zawsze wygrywa z wyliczeniem. */
+    const _rdzen = String(o.user || '');
+    const _zZerem = /0$/.test(_rdzen) && _rdzen.length > 1;
+    const _kontoZap = nr => {           /* nr: 2 = pierwszy zapas, 3 = drugi */
+      if (!_rdzen) return '';
+      if (_zZerem) { const r = _rdzen.slice(0, -1); return nr === 2 ? r : r + '2'; }
+      return _rdzen + nr;
+    };
     const _host2 = (o.host2 || '').trim();
-    const _user2 = o.user2 || (o.user ? o.user + '2' : '');
+    const _user2 = o.user2 || _kontoZap(2);
     const _pass2 = o.pass2 || o.pass;
     if (_host2 && _user2) { const a2 = adres(_host2, o.port2);
       /*  ⚠ ZAKRES TEMATÓW BIERZEMY Z PIERWSZEGO KONTA, NIE Z DRUGIEGO [D-316, Tomasz 2026-09-11: konto klienta
@@ -788,7 +798,7 @@
         nadaje. Konto i hasło jak przy pierwszej rezerwie; zakres tematów ZAWSZE z konta głównego
         (ta sama zasada co w D-316 — to ten sam obiekt, różnią się tylko konta u dostawców). */
     const _host3 = (o.host3 || '').trim();
-    const _user3 = o.user3 || (o.user ? o.user + '3' : '');
+    const _user3 = o.user3 || _kontoZap(3);
     const _pass3 = o.pass3 || o.pass;
     if (_host3 && _user3) { const a3 = adres(_host3, o.port3);
       POL.push({ nr: 3, host: a3.host, port: a3.port, user: _user3, pass: _pass3,
@@ -1571,8 +1581,7 @@
     };
     const dodajSerwer = (nr, host, powod) => {
       const a = adres(host);
-      const user = nr === 2 ? (o.user2 || (o.user ? o.user + '2' : ''))
-                            : (o.user3 || (o.user ? o.user + '3' : ''));
+      const user = nr === 2 ? (o.user2 || _kontoZap(2)) : (o.user3 || _kontoZap(3));
       if (!a.host || !user) return;
       const c = { nr, host: a.host, port: a.port, user,
                   pass: (nr === 2 ? (o.pass2 || o.pass) : (o.pass3 || o.pass)),
