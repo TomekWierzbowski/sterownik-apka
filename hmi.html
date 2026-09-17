@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'f61da845d8';
+window.APKA_WERSJA = '96dbf2a0a9';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 13:54';
+window.HMI_ZBUDOWANO = '2026-09-17 15:50';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -6055,7 +6055,11 @@ window.HMI_ZBUDOWANO = '2026-09-17 13:54';
             const html = sp
               ? wiersz('główny', sp.glowny, sp.niesie === 1 ? ' <span style="color:#9fd3ff">← tym nadaje</span>' : '')
                 + wiersz('zapas', sp.zapas1, sp.niesie === 2 ? ' <span style="color:#9fd3ff">← tym nadaje</span>' : '')
-                + wiersz('rezerwa', sp.zapas2, ' <span style="color:#8d949e">· ' + (ZAP_STAN[sp.zapas2 && sp.zapas2.stan] || '?') + '</span>')
+                /*  [D-414] REZERWA NA TYM SAMYM BROKERZE CO ZAPAS TO NIE JEST DROGA ZAPASOWA.
+                    Liczy to STEROWNIK (pole `dubel` w spisie), nie apka - inaczej most, apka i webhmi
+                    porownywalyby adresy kazde po swojemu i rozjezdzaly sie w tym, co pokazuja. */
+                + wiersz('rezerwa', sp.zapas2, ' <span style="color:#8d949e">· ' + (ZAP_STAN[sp.zapas2 && sp.zapas2.stan] || '?') + '</span>'
+                    + (sp.dubel ? ' <span style="color:#d08b5b">· to ten sam broker co zapas — padnie razem z nim</span>' : ''))
               : '<div style="color:#8d949e">sterownik jeszcze nie podał spisu serwerów</div>';
             if (st._html !== html) { st._html = html; st.innerHTML = html; }
           }
