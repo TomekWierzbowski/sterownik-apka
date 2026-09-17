@@ -1177,6 +1177,8 @@
         const przerwa = (ponownie && c.zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - c.zerwaneOd) / 1000) + ' s' + (c.byloWTle ? ', telefon był w tle' : '') + ')' : '';
         c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.nieudane = 0;
         c.dzialaloOd = Date.now();       /* [D-407] połączenie NAPRAWDĘ stanęło - dopiero to pozwala zerować odstęp */
+        /* [D-408] krótki meldunek do serwisu - po chwili, gdy subskrypcje i wybór obiektu już stoją */
+        setTimeout(() => { try { if (M.wyslijDziennik) M.wyslijDziennik(false); } catch (e) {} }, 4000);
         c.ostOdbior = Date.now();        /* [D-355] swiezo polaczony - strażnik ciszy liczy od teraz */
         if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
         c.stan = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
@@ -1249,6 +1251,36 @@
     oddaj(!!(wybrany && obiekty[wybrany]));   /* od razu: liczby z pamięci pod zasłoną albo plansza „łączę z brokerem…" */
     /* wiek pakietu ma płynąć także między pakietami - kafel ma zblednąć, gdy obiekt zamilkł */
     setInterval(() => oddaj(false), 1000);
+    /*  [D-408] DZIENNIK APKI WRACA DO SERWISU PO MQTT — temat `<obieg>/apka`.
+        ⚠ PO CO: gdy klient mówi „nie działa", jedyną drogą do tego, co widzi jego telefon, był
+          zrzut ekranu. Dziś apka sama odsyła wersję, stan obu serwerów i ostatnie linie dziennika —
+          czyli dokładnie to, czego szukaliśmy dziś rano, przepisując ekran po ekranie.
+        ⚠ DWA TRYBY, ŚWIADOMIE: KRÓTKI (jedna linia przy połączeniu — tanie, zawsze) i PEŁNY
+          (na żądanie człowieka). Ciągłe nadawanie całego dziennika zjadałoby łącze i zamieniło
+          temat diagnostyczny w drugi strumień stanu, którego nikt nie czyta.
+        ⚠ Wysyłamy na temat WYBRANEGO obiegu: konto klienta ma prawo pisać tylko u siebie, więc
+          diagnostyka jednego klienta nie trafi nigdy w cudze poddrzewo. */
+    M.wyslijDziennik = pelny => {
+      const c = klDla(wybrany);
+      if (!wybrany || !c || !c.kl || !c.kl.isConnected()) return false;
+      const gl = 'apka ' + (window.APKA_WERSJA || '?')
+               + ' | serwery: ' + POL.map(x => (x.nr || 1) + ':' + ((x.stan && x.stan.stan) || '?')).join(' ')
+               + ' | obiekt ' + wybrany;
+      const tresc = pelny
+        ? gl + '
+' + M.dziennik.map(w => {
+            const d = new Date(w.t);
+            const dwa = n2 => (n2 < 10 ? '0' : '') + n2;
+            return dwa(d.getHours()) + ':' + dwa(d.getMinutes()) + ':' + dwa(d.getSeconds()) + ' ' + w.txt;
+          }).join('
+')
+        : gl;
+      try {
+        const m = new Paho.Message(tresc); m.destinationName = wybrany + '/apka'; m.qos = 0;
+        c.kl.send(m); return true;
+      } catch (e) { return false; }
+    };
+
     M.wybierzObiekt = pref => { if (obiekty[pref]) { wybrany = pref; try { localStorage.setItem('mqtt_obiekt', pref); } catch (e) {} oglos(tempo); oddaj(true); } };
     /*  SPRAWDŹ PIN [2026-09-09, Tomasz: „PIN do serwisu taki, jaki jest ustawiony w sterowniku"]:
         publikuje `pin=` bez `w=` (sterownik nic nie zapisuje, tylko odpowiada, czy PIN pasuje).
