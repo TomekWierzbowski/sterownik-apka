@@ -84,7 +84,7 @@
 (function(){
   const el = id => document.getElementById(id);
   const q = new URLSearchParams(location.search);
-  const HOST = 'aquareact.duckdns.org:8887', HOST2 = 'c5927e26d92d41508c1ea56fea1b6be2.s1.eu.hivemq.cloud';
+  const HOST = 'aquareact.duckdns.org:8887', HOST2 = '';
   let z = null; try { z = JSON.parse(localStorage.getItem('odbior_mqtt') || 'null'); } catch(e){}
   try { localStorage.setItem('pwa', '1'); } catch(e){}
   /* zapamiętane dane i nikt nie prosił o ekran logowania -> prosto do HMI */
