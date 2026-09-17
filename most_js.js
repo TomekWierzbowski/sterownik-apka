@@ -778,7 +778,7 @@
         (`rezerwaBrak` niżej), a nie zastąpiony zgadywanką ani przemilczany. To godzi obie lekcje:
         nie ma cichego siedzenia na pustym brokerze i nie ma burzy ponowień na cudzym.
         ⚠ Ponawianie i tak jest dziś odporne [D-407]: odstęp rośnie, a martwa droga nie każe
-        sterownikowi wracać do nadawania oboma. Ale to zabezpieczenie, nie powód, żeby zgadywać. */
+        sterownikowi wracać do nadawania równoległego. Ale to zabezpieczenie, nie powód, żeby zgadywać. */
     /*  KONTA ZAPASOWE: DO NAZWY DOKLEJA SIE NUMER SERWERA  [D-416, Tomasz 17.09]
         ------------------------------------------------------------
             nasz broker   `Master`   `wanna-gliczarow`      (bez cyfry = serwer glowny)
@@ -878,18 +878,18 @@
     /*  KTÓRĄ DROGĄ CIĘŻKIE TEMATY [D-321, Tomasz: „to robi apka - pełna zgoda"]: sterownik nadawał
         każdą paczkę na oba brokery, więc jego łącze i limity brokerów płaciły dwa razy. Kto niesie
         obiekt, wie tylko apka - z tego, którym połączeniem paczki naprawdę przychodzą (`w.kl`).
-        Mówimy to przy każdym odnowieniu żądania: `1000;niesie=1`. Zero = „nadawaj oboma" i tak samo
+        Mówimy to przy każdym odnowieniu żądania: `1000;niesie=1`. Zero = „nadawaj równolegle" i tak samo
         rozumie to starszy sterownik, który tego dopisku w ogóle nie zna (czyta samą liczbę). */
     /*  ⛔ NUMER MUSI BYC Z JEZYKA STEROWNIKA, NIE Z NASZEGO [D-411, zmierzone 17.09 sonda
         `_sonda_pwa_spis`]. Apka numeruje polaczenia po swojemu (1 = pierwsze na liscie), a sterownik
         czyta `niesie=N` jako SWOJ slot N. W wariancie A te numery sie rozjechaly: nasz broker jest
         u sterownika slotem 2, wiec „niesie=1" kierowalo ciezkie tematy na brokera, ktorego apka
         w ogole nie sluchala. Objaw: obraz zywy, ale rwacy sie co kilka sekund - apka po 8 s ciszy
-        prosila „nadawaj oboma", dostawala dane, znowu wskazywala „serwer 1" i tak w kolko.
+        prosila „nadawaj równolegle", dostawala dane, znowu wskazywala „serwer 1" i tak w kolko.
         Teraz kazde polaczenie wie, ktorym slotem sterownika jest (`c.slot` z tematu `serwery`,
         pole `ja` - przychodzi TA SAMA droga, ktorej dotyczy, wiec nazwy adresow nie musza pasowac).
         ⚠ STEROWNIK BEZ TEGO POLA (starsze wgranie) daje `slot` pusty - wtedy 0, czyli „nadawaj
-        oboma". Podwojny ruch zamiast rwacego obrazu; naprawia sie samo po wgraniu firmware. */
+        równolegle". Podwojny ruch zamiast rwacego obrazu; naprawia sie samo po wgraniu firmware. */
     const niesieNr = () => {
       if (POL.length < 2) return 0;
       const w = wybrany && obiekty[wybrany];
@@ -929,12 +929,12 @@
               «odbieram tematy»"]. Pod spodem to nadal dopisek `niesie=N` w `zadanie`, ktory kaze
               sterownikowi kierowac tam `zm` i `blok` - ale czytajacy dziennik chce wiedziec, ktora
               droga PLYNA DANE, a nie jak sie o to prosi. */
-          zapisz(nr ? 'odbieram dane przez ' + NAZWA_DROGI(nr) : 'odbieram dane WSZYSTKIMI drogami'); }
+          zapisz(nr ? 'odbieram dane przez ' + NAZWA_DROGI(nr) : 'odbieram dane RÓWNOLEGLE wszystkimi drogami'); }
       }
       /*  ŻĄDANIE IDZIE WSZYSTKIMI DROGAMI [D-327, uwaga z audytu]: dotąd szło tylko tą, którą uważamy
           za niosącą. Gdy sterownik straci WŁAŚNIE tego brokera, prośba leci w próżnię, a sterownik
           dowie się o stracie dopiero po swoim keepalive - i przez ten czas nie wie, że ma wrócić do
-          nadawania oboma. Powtórkę tej samej treści sterownik odsiewa w oknie 3 s [D-319], więc to
+          nadawania równoległego. Powtórkę tej samej treści sterownik odsiewa w oknie 3 s [D-319], więc to
           nic nie kosztuje poza kilkudziesięcioma bajtami. */
       let poszlo = 0;
       POL.forEach(c => { if (!c.kl.isConnected()) return;
@@ -998,7 +998,7 @@
     M.niesieReset = () => { if (niesieOst !== 0 && POL.some(c => c.kl.isConnected())) oglos(tempo, 0); };
     /*  PRÓBA BRZEGOWA [D-322]: sonda musi umieć zerwać JEDNĄ drogę, żeby zmierzyć, po ilu sekundach
         obraz wraca drugą. Zamykamy gniazdo dokładnie tak, jak robi to sieć - reszta dzieje się sama
-        (Paho zgłasza zerwanie, apka prosi sterownik o nadawanie oboma). Nie wystawiamy tu kont ani
+        (Paho zgłasza zerwanie, apka prosi sterownik o nadawanie równoległe). Nie wystawiamy tu kont ani
         haseł - tylko tę jedną czynność. */
     M._zerwij = nr => { const c = POL.find(x => x.nr === nr); if (!c || !c.gniazdo) return false;
       try { c.gniazdo.close(); zapisz('próba brzegowa: zerwano serwer ' + nr); return true; } catch (e) { return false; } };
@@ -1013,14 +1013,14 @@
       /*  [D-315] cisza u niosącego (6 s) albo jego zerwanie = wpinamy ciężkie tematy z powrotem WSZĘDZIE.
           Lepiej przez chwilę odebrać dwa razy, niż nie odebrać wcale. */
       /*  [D-332] PROG CISZY 12 s -> 8 s. Przy awarii drogi to WLASNIE ten prog wyznacza dziure
-          w obrazie, bo aplikacja prosi „nadawaj oboma" szybciej, niz sterownik zdazy zauwazyc awarie
+          w obrazie, bo aplikacja prosi „nadawaj równolegle" szybciej, niz sterownik zdazy zauwazyc awarie
           (zmierzone: obraz wracal po 14,8-20,2 s, a sterownik wiedzial dopiero po 22,1 s). Heartbeat
           idzie co 5 s, wiec 8 s to poltora heartbeatu - falszywa prosba kosztuje chwile podwojnego
           odbioru i nic wiecej. */
       const cisza = !w || !w.kiedy || Date.now() - w.kiedy > 8000;
       if (POL.length > 1 && (cisza || POL.some(c => c.lekki && c.stan.stan !== 'ok'))) {
         POL.forEach(c => { c.bliz = 0; wepnijCiezkie(c); });
-        /*  [D-321] i mówimy o tym STEROWNIKOWI od ręki: niech znowu nadaje oboma. Bez tego czekałby
+        /*  [D-321] i mówimy o tym STEROWNIKOWI od ręki: niech znowu nadaje równolegle. Bez tego czekałby
             na najbliższe odnowienie żądania, czyli do 20 s ciszy na ekranie. */
         if (niesieOst !== 0) oglos(tempo, 0);
       }
@@ -1161,7 +1161,7 @@
           a `blok` nie odsiewał nic — a bierze numer z tego samego licznika. Blok o numerze niższym
           niż nasze lustro wołał `zastosujPelny`, które cofało `w.seq` i podmieniało mb/mn/r STARSZĄ
           migawką: świeżo zapalone światło gasło na telefonie, a następna zmiana wyglądała jak luka
-          i wymuszała kolejną prośbę o pełny blok. Przy dwóch brokerach blok i zmiana idą obiema
+          i wymuszała kolejną prośbę o pełny blok. Przy dwóch brokerach blok i zmiana idą równolegle dwiema
           drogami i potrafią się wyminąć w drodze, więc sam porządek po stronie sterownika nie wystarcza.
           Duży skok w dół zostaje przyjęty — to restart sterownika albo przewinięcie licznika. */
       {
@@ -1319,7 +1319,7 @@
         zapisz(etyk(c) + 'zerwane: ' + co); oddaj();
         /*  ⚠ TYLKO GDY TO BYŁA DROGA, KTÓRĄ OBIEKT DOCIERAŁ [D-407, objaw zmierzony 17.09].
             Dotąd KAŻDE zerwanie - także serwera, który nigdy nie działał - kazało sterownikowi wrócić
-            do nadawania oboma. Martwy serwer 2 robił to co dwie sekundy i szarpał tym pierwszym:
+            do nadawania równoległego. Martwy serwer 2 robił to co dwie sekundy i szarpał tym pierwszym:
             w dzienniku „serwer 1: połączony ponownie (przerwa 4 s)", a w apce znikające obiegi. */
         if (niosl && M.niesieReset) M.niesieReset();
         /*  ⚠ ODSTĘP ZERUJEMY TYLKO PO POŁĄCZENIU, KTÓRE NAPRAWDĘ DZIAŁAŁO [D-407].
@@ -1793,7 +1793,7 @@
             falszem po KAZDYM polaczeniu (onSuccess), a prawda dopiero po pieciu duplikatach - wiec
             cicha rezerwa, ktora duplikatow nigdy nie zbierze, byla uznawana za „niosaca" i zrywana.
             Pytamy teraz o to, CO SAMI ZAMOWILISMY: `niesieOst` to ostatnie zadanie wyslane do
-            sterownika - 0 znaczy „nadawaj oboma" (wiec obie drogi maja co przynosic), a numer znaczy
+            sterownika - 0 znaczy „nadawaj równolegle" (wiec obie drogi maja co przynosic), a numer znaczy
             „nadawaj tym jednym". Do tego sprawdzamy, czy sterownik w ogole jest online. */
         const ob = wybrany && obiekty[wybrany];
         const sterownik_zywy = !!ob && ob.status !== 'offline';
