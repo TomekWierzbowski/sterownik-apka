@@ -633,7 +633,21 @@
     const zdarzenia = {};               /* prefiks -> {ile, zgubione, wpisy[[czas,kat,kod,zr,ob,a,b,c]]} [D-295] */
     let czekaPliki = null, czekaPlik = null;                      /* prośby o listę / plik z karty SD [D-297] */
     let czekaZapas = null;                                        /* [D-412] kto czeka na meldunek o rezerwie */
-    const _spisy = {};                                            /* [D-426a] spis serwerow PER OBIEG */
+    const _spisy = {};                            /* [D-429] obieg -> droga -> {s, kiedy, zastany} */
+    /*  Ktoremu spisowi wierzyc, gdy drogi podaja rozne [D-429]:
+        1. z drogi, ktora obiekt NADAJE - tylko ona jest z definicji swieza;
+        2. najswiezszy NIEZASTANY (sterownik wlasnie go oglosil);
+        3. w ostatniej kolejnosci najnowszy jakikolwiek - lepszy niz nic. */
+    const _spisWybrany = pref => {
+      const d = _spisy[pref]; if (!d) return null;
+      const w = obiekty[pref];
+      const nios = w && w.kl && w.kl.nr;
+      if (nios && d[nios]) return d[nios].s;
+      const lista = Object.keys(d).map(k => d[k]);
+      const swieze = lista.filter(x => !x.zastany).sort((a, b) => b.kiedy - a.kiedy);
+      if (swieze.length) return swieze[0].s;
+      return lista.sort((a, b) => b.kiedy - a.kiedy)[0].s;
+    };
     /*  PROSBA O OKRES - OSOBNA NA KAZDA KATEGORIE [D-348, 2026-09-12]
         ------------------------------------------------------------
         WEJSCIA:  zadania `/okres?kat=zdarzenia` i `/okres?kat=alarmy`; odpowiedzi z tematu `okres`.
@@ -1043,7 +1057,7 @@
         try { const s = JSON.parse(m.payloadString); if (s && s.czas) zegar[cz.slice(0, -1).join('/')] = { czas: s.czas, kiedy: Date.now() }; } catch (e) {}
         return;
       }
-      if (rodzaj === 'serwery') { spisSerwerow(m.payloadString, cz.slice(0, -1).join('/')); return; }   /* [D-411] */
+      if (rodzaj === 'serwery') { spisSerwerow(m.payloadString, cz.slice(0, -1).join('/'), m.retained); return; }   /* [D-411] */
       if (rodzaj === 'zapas') {                     /* [D-412] meldunek sterownika o rezerwie */
         const pref = cz.slice(0, -1).join('/');
         const txt = m.payloadString || '';
@@ -1467,7 +1481,7 @@
     };
 
     M.wybierzObiekt = pref => { if (obiekty[pref]) { wybrany = pref; wybranyRecznie = true;
-      M.ostSpisSerwerow = _spisy[pref] || null;   /* [D-426a] spis idzie za wybranym obiegiem */
+      M.ostSpisSerwerow = _spisWybrany(pref);     /* [D-429] spis idzie za wybranym obiegiem */
       try { localStorage.setItem('mqtt_obiekt', pref); } catch (e) {} oglos(tempo); oddaj(true); } };
     /*  SPRAWDŹ PIN [2026-09-09, Tomasz: „PIN do serwisu taki, jaki jest ustawiony w sterowniku"]:
         publikuje `pin=` bez `w=` (sterownik nic nie zapisuje, tylko odpowiada, czy PIN pasuje).
@@ -1704,14 +1718,16 @@
         ma w sterowniku 1 do 1"]. Recznie wpisany zapas jest ziarnem na czas, zanim sterownik sie
         odezwie; potem obowiazuje to, co on mowi. Kazda taka zmiana idzie do dziennika lacza, zeby
         nie byla cicha. */
-    const spisSerwerow = (tekst, pref) => {
+    const spisSerwerow = (tekst, pref, zastany) => {
       let s = null; try { s = JSON.parse(tekst); } catch (e) { return; }
       if (!s) return;
       /*  ⛔ SPIS JEST WLASNOSCIA OBIEGU, NIE APKI [D-426a]. Jedno wspolne pole znaczylo, ze ekran
           basenu pokazywal spis sadzawki - ten, ktory przyszedl ostatni. Konto serwisowe oglada
           kilka obiegow naraz, wiec to nie jest przypadek brzegowy, tylko codziennosc. */
-      _spisy[pref] = s;
-      if (pref === wybrany) M.ostSpisSerwerow = s;   /* do podgladu w serwisie i na ekranie */
+      /*  [D-429] spis jest wlasnoscia OBIEGU I DROGI - kazdy broker ma wlasna kopie i wlasny wiek. */
+      const nrD = (_zrodlo && _zrodlo.nr) || 0;
+      (_spisy[pref] || (_spisy[pref] = {}))[nrD] = { s, kiedy: Date.now(), zastany: !!zastany };
+      if (pref === wybrany) M.ostSpisSerwerow = _spisWybrany(pref);
       /*  ⚠ ZASTANY SPIS BYWA SPRZED ZMIANY FIRMWARE [D-426]. Gdy brakuje w nim pola, ktorego
           potrzebujemy do opisania slotow (`pol` = czy sterownik ma tam polaczenie), prosimy
           sterownik o swiezy - raz, zeby nie robic z tego petli. Milczenie o stanie slotu jest
