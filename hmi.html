@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '219d331da6';
+window.APKA_WERSJA = '7091492182';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 22:37';
+window.HMI_ZBUDOWANO = '2026-09-17 22:45';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5843,7 +5843,7 @@ window.HMI_ZBUDOWANO = '2026-09-17 22:37';
               + '</div>'
               + '<div id="ust-brokery" hidden style="flex:0 0 auto"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
                 + '<div id="ust-brokery-l"></div>'
-                + '<div style="font-size:11px;color:#8d949e;margin-top:6px">Sterownik ma <b>dwa sloty</b>: slot 1 to nasz Mosquitto, a o slot 2 konkurują <b>dwie rezerwy</b> u różnych dostawców — automat sprawdza je co tydzień i wstawia tę, która żyje. Aplikacja słucha wszystkich trzech, żeby nie przegapić zamiany.</div></div>'
+                + '<div style="font-size:11px;color:#8d949e;margin-top:6px">Sterownik ma <b>dwa sloty</b>: slot 1 to <b>główny serwer Mosquitto</b>, a o slot 2 konkurują <b>dwie rezerwy</b> u różnych dostawców — automat sprawdza je co tydzień i wstawia tę, która żyje. Aplikacja słucha wszystkich trzech, żeby nie przegapić zamiany.</div></div>'
               /*  REZERWA STEROWNIKA [D-412] - TYLKO SERWIS. Sterownik trzyma u siebie trzeci adres
                   (rezerwe), ktory sam wstawia na miejsce zapasu, gdy ten zamilknie [D-383]. Dotad
                   zmienialo sie to wylacznie przy sterowniku; teraz widac to i zmienia sie stad.
@@ -6033,7 +6033,7 @@ window.HMI_ZBUDOWANO = '2026-09-17 22:37';
                 Rozjazd („telefon slucha tam, gdzie sterownik nie nadaje") widac wtedy od razu,
                 bez skladania dwoch list w glowie. */
             const sp = (window.MOST_JS && window.MOST_JS.rezerwa && window.MOST_JS.rezerwa.spis()) || null;
-            const NAZWY = { 1: 'slot 1 — nasz Mosquitto', 2: 'rezerwa 1', 3: 'rezerwa 2' };
+            const NAZWY = { 1: 'slot 1 — Główny serwer Mosquitto', 2: 'rezerwa 1', 3: 'rezerwa 2' };
             const ZAPST = ['nie sprawdzana', 'żywa', 'nie odpowiada', 'nie ustawiona'];
             const opisSter = nr => {
               if (!sp) return '';
