@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '4dc106ff8d';
+window.APKA_WERSJA = '77ef9bc24f';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-16 05:49';
+window.HMI_ZBUDOWANO = '2026-09-17 09:06';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5991,6 +5991,13 @@ window.HMI_ZBUDOWANO = '2026-09-16 05:49';
           if (pt && pokaz) pt.innerHTML = (br.stan !== 'ok' ? br.opis
               : !d.obiekt ? 'połączony z brokerem, czekam na listę obiektów…'
               : w.status === 'offline' ? 'sterownik <b>' + d.obiekt.split('/').slice(1).join(' / ') + '</b> jest offline (bez internetu albo wyłączony)'
+              /*  ⚠ NIE MA TAKIEGO OBIEGU - POWIEDZ TO WPROST [D-403, zasada 10]. Dotad apka pisala
+                  „czekam na dane" takze wtedy, gdy nazwa byla literowka: brzmialo to jak problem
+                  z laczem i kazalo szukac w routerze, a wystarczylo wybrac z listy. Wiemy to na
+                  pewno, gdy konto WIDZI jakies obiegi, a wsrod nich nie ma wybranego. */
+              : (d.obiekty && d.obiekty.length && d.obiekty.indexOf(d.obiekt) < 0)
+                ? 'na tym brokerze nie ma obiegu <b>' + d.obiekt.split('/').slice(1).join(' / ')
+                  + '</b> — wybierz właściwy z listy powyżej'
               : 'połączony z brokerem, czekam na dane z obiektu <b>' + d.obiekt.split('/').slice(1).join(' / ') + '</b>…')
             + (_pwa ? '<div style="margin-top:18px"><a href="index.html?login=1" style="color:#9fd3ff">logowanie</a></div>' : '');
         }
