@@ -482,15 +482,39 @@
     /*  KTO WIDZI CO [D-312]: `serwis` przychodzi z logowania (ptaszek „konto serwisowe"). Gdy go nie ma - zapis
         sprzed 11.09 - zostaje stara zasada (login bez myślnika = serwisowy), żeby zapamiętane logowanie nie padło.
         ⚠ Sama zasada była dziurawa: klient o jednoczłonowej nazwie („Sadzawka") dostawał widok na wszystkie obiekty. */
+    /*  ZAKRES TEMATOW - DWIE POSTACI NAZW NARAZ  [D-439, Tomasz 2026-09-18]
+        ═══════════════════════════════════════════════════════════════════════════════════════
+        WEJSCIA:   nazwa konta na brokerze · ptaszek „konto serwisowe"
+        CO Z CZEGO WYNIKA: nowa postac tematu to `obiekt/<nazwa konta>` - DWA poziomy, a nazwa
+                   obiektu jest wprost nazwa konta. Stara to `basen/<a>/<b>` - trzy poziomy,
+                   gdzie temat powstawal przez zamiane pierwszego myslnika na ukosnik.
+        WYJSCIA:   LISTA wzorcow, od najnowszego. Pierwszy sluzy tez za opis na ekranie.
+
+        ⚠ OBA NARAZ, BO FLOTA PRZECHODZI POJEDYNCZO. Sterownik dostaje nowy prefiks przy wizycie
+          na obiekcie, wiec przez jakis czas czesc obiektow nadaje pod `basen/`, a czesc pod
+          `obiekt/`. Gdyby apka znala tylko jedna postac, wpiecie jednego obiektu odcinaloby
+          serwisowi widok na pozostale.
+        ⚠ Stara postac ZNIKNIE, gdy ostatni sterownik przejdzie - wtedy zostaje sama pierwsza
+          pozycja listy (DOZROBIENIA: migracja prefiksu). */
     const zakresZ = (uzyt, serwis) => { const u = String(uzyt || ''); const i = u.indexOf('-');
       const serw = (serwis === undefined || serwis === null) ? (i <= 0) : !!serwis;
-      return serw ? 'basen/+/+' : (i > 0 ? 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1) : 'basen/' + u + '/+'); };
+      if (serw) return ['obiekt/+', 'basen/+/+'];
+      /*  Klient: nowy temat to wprost nazwa konta; stary wymagal rozbicia po pierwszym mysliku. */
+      const stary = i > 0 ? 'basen/' + u.slice(0, i) + '/' + u.slice(i + 1) : 'basen/' + u + '/+';
+      return ['obiekt/' + u, stary]; };
     const serwisowe = (o.serwis === undefined || o.serwis === null)
                       ? (String(o.user || '').indexOf('-') <= 0)   /* stary zapis: login bez myslnika = serwisowy */
                       : !!o.serwis;
-    if (!o.temat) { o.temat = zakresZ(o.user, o.serwis);
-      if (o.temat.indexOf('+') < 0 && !o.obiekt) o.obiekt = o.temat; }
+    /*  [D-439] `temat` zostaje NAPISEM (opis na ekranie, zgodnosc z zapamietanym logowaniem),
+        a `tematy` to lista wzorcow, ktorymi naprawde sie zapisujemy. Rozdzielenie jest celowe:
+        ekran ma pokazac jedno zdanie, a nasluch ma objac obie postaci nazw. */
+    if (!o.temat) { const lista = zakresZ(o.user, o.serwis);
+      o.tematy = lista; o.temat = lista[0];
+      /*  Konto jednego obiektu (bez `+` w zadnym wzorcu) samo wskazuje, ktory obiekt otworzyc. */
+      if (lista.every(t => t.indexOf('+') < 0) && !o.obiekt) o.obiekt = lista[0]; }
+    if (!o.tematy) o.tematy = [o.temat];
     M.zakres = o.temat;   /* [D-312] widoczne dla sond i diagnostyki: co to konto ogląda */
+    M.zakresy = o.tematy;
     /*  KOMENDY PRZEZ BROKER [D-267, Tomasz: „apka nie musi mieć uprawnień, bo
         serwis za PIN-em, a reszta dla klienta"]. fetch('/cmd?co=…') z makiety
         tłumaczymy jak dla AP (komendaNaZapisy → lista zapisów rejestrów) i
@@ -688,7 +712,8 @@
     const zapisz = txt => { M.dziennik.push({ t: Date.now(), txt }); if (M.dziennik.length > 60) M.dziennik.shift(); };
     zapisz('start klienta ' + (window.APKA_WERSJA || '(bez wersji)') + ' → ' + o.host);
     /* [D-312] w dzienniku łącza widać, CO to konto ogląda - inaczej „nie widzę obiektu" i „nie mam uprawnień" wyglądają tak samo */
-    zapisz('zakres kont' + 'a: ' + o.temat + (o.temat === 'basen/+/+' ? ' (serwisowe - wszystkie sterowniki)' : ' (jeden obiekt)'));
+    zapisz('zakres kont' + 'a: ' + o.tematy.join(' + ')
+           + (o.temat.indexOf('+') >= 0 ? ' (serwisowe - wszystkie sterowniki)' : ' (jeden obiekt)'));
     const wydawcy = () => { const w = {}; for (const p in obiekty)
       w[p] = { status: obiekty[p].status || '?', wiek_s: obiekty[p].kiedy ? (Date.now() - obiekty[p].kiedy) / 1000 : null }; return w; };
     let czekamPoPowrocie = false;        /* od powrotu na ekran / zerwania do pierwszej paczki [D-279] */
@@ -742,7 +767,7 @@
       if (i > 0 && /^\d+$/.test(s.slice(i + 1))) return { host: s.slice(0, i), port: +s.slice(i + 1) };
       return { host: s, port: domyslny || (/emqxsl\.com$/i.test(s) ? 8084 : 8884) }; };
     const a1 = adres(o.host, o.port);
-    const POL = [{ nr: 1, host: a1.host, port: a1.port, user: o.user, pass: o.pass, temat: o.temat }];
+    const POL = [{ nr: 1, host: a1.host, port: a1.port, user: o.user, pass: o.pass, temat: o.temat, tematy: o.tematy }];
     /*  DRUGI SERWER MA SIE WYLICZYC SAM [D-350, 2026-09-13; objaw Tomasza: „sadzawka - nie widze jej…
         ani broker ani sterownik", przy dzialajacym basenie]
         ------------------------------------------------------------
@@ -818,7 +843,7 @@
           konta dawało `basen/wanna/gliczarow2`, czyli nasłuch w próżni. Nazwa konta na drugim brokerze może być
           dowolna; `temat2` zostaje furtką, gdyby kiedyś prefiks naprawdę się różnił. */
       POL.push({ nr: 2, host: a2.host, port: a2.port, user: _user2, pass: _pass2,
-                 temat: o.temat2 || o.temat }); }
+                 temat: o.temat2 || o.temat, tematy: o.temat2 ? [o.temat2] : o.tematy }); }
     /*  [D-410] DRUGA REZERWA — sterownik wybiera JEDNĄ z dwóch kandydatek [D-383] i apka nie wie,
         którą akurat wziął. Dlatego słucha obu: obiekt pokaże się niezależnie od tego, przez którą
         nadaje. Konto i hasło jak przy pierwszej rezerwie; zakres tematów ZAWSZE z konta głównego
@@ -828,7 +853,7 @@
     const _pass3 = o.pass3 || o.pass;
     if (_host3 && _user3) { const a3 = adres(_host3, o.port3);
       POL.push({ nr: 3, host: a3.host, port: a3.port, user: _user3, pass: _pass3,
-                 temat: o.temat3 || o.temat }); }
+                 temat: o.temat3 || o.temat, tematy: o.temat3 ? [o.temat3] : o.tematy }); }
     /*  ⚠ „REZERWY NIE MA" MÓWIMY WPROST (zasada 10) — to jest właśnie ta luka, przez którą D-373
         kazało zgadywać adres. Widoczny stan zamiast ciszy albo zgadywanki. */
     M.rezerwaBrak = (POL.length < 2);
@@ -1277,10 +1302,34 @@
         (`status`, `wynik`, `stan`, dziennik, karta) zostają na obu: są rzadkie, a `status` z obu jest nam potrzebny,
         żeby odróżnić „sterownik padł" od „ten broker już go nie obsługuje" (testament - D-314). */
     const CIEZKIE = ['zm', 'blok'];
+    /*  ZAPISANIE SIE NA TEMAT, KTORE PRZEZYWA ODMOWE  [D-439]
+        ─────────────────────────────────────────────────────────────────────────────────────
+        WEJSCIA:   polaczenie · pelny temat ze wzorcem · jakosc uslugi
+        CO Z CZEGO WYNIKA: od 18.09 apka zapisuje sie na DWIE postaci nazw (`obiekt/...` i stara
+                   `basen/...`), bo flota przechodzi na nowy prefiks pojedynczo. Uprawnienia na
+                   brokerze porownuja WZORZEC, nie tematy - wiec konto majace regule tylko na
+                   jedna postac dostanie ODMOWE na druga. To jest normalne i ma przejsc bez
+                   sladu na ekranie.
+        WYJSCIA:   subskrypcja albo cicha linijka w dzienniku lacza.
+
+        ⛔ BEZ WLASNEJ OBSLUGI NIEPOWODZENIA pierwsza odmowa przerywala petle `forEach` wyjatkiem
+           i zabierala WSZYSTKIE pozostale tematy na tej drodze - czyli jedna odmowa na wzorzec,
+           ktorego i tak nie potrzebujemy, uciszalaby cale polaczenie.
+        ⚠ Odmowy NIE pokazujemy jako bledu uzytkownikowi: to nie usterka, tylko skutek tego, ze
+          konto ma prawa do jednej postaci nazw. W dzienniku zostaje, bo serwis ma widziec, czym
+          apka naprawde sie zapisala. */
+    const _zapisz_sie = (c, temat, qos) => {
+      try {
+        c.kl.subscribe(temat, { qos: qos,
+          onFailure: () => zapisz(etyk(c) + 'bez dostępu do ' + temat + ' - to konto ogląda inną postać nazw') });
+      } catch (e) { zapisz(etyk(c) + 'nie udało się zapisać na ' + temat); }
+    };
     const odepnijCiezkie = c => { if (c.lekki) return; c.lekki = true;
-      try { CIEZKIE.forEach(tm => c.kl.unsubscribe(c.temat + '/' + tm)); zapisz(etyk(c) + 'nie odbieram danych - te same paczki idą drugą drogą'); } catch (e) {} };
+      try { (c.tematy || [c.temat]).forEach(z => CIEZKIE.forEach(tm => c.kl.unsubscribe(z + '/' + tm)));
+            zapisz(etyk(c) + 'nie odbieram danych - te same paczki idą drugą drogą'); } catch (e) {} };
     const wepnijCiezkie = c => { if (!c.lekki || !c.kl.isConnected()) return; c.lekki = false;
-      try { TEMATY.filter(tm => CIEZKIE.indexOf(tm[0]) >= 0).forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
+      try { (c.tematy || [c.temat]).forEach(z => TEMATY.filter(tm => CIEZKIE.indexOf(tm[0]) >= 0)
+              .forEach(tm => _zapisz_sie(c, z + '/' + tm[0], tm[1])));
             zapisz(etyk(c) + 'odbieram dane tędy'); } catch (e) {} };
     const zrobDriver = c => {
       c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
@@ -1376,7 +1425,7 @@
       };
       c.opcje = { useSSL: true, userName: c.user, password: c.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: false,
         onSuccess: () => { c.lekki = false; c.bliz = 0;
-                           TEMATY.forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
+                           (c.tematy || [c.temat]).forEach(z => TEMATY.forEach(tm => _zapisz_sie(c, z + '/' + tm[0], tm[1])));
                            if (wybrany) oglos(tempo); },
         onFailure: r => {
           const rc = rcZ(r);
@@ -1452,7 +1501,7 @@
     if (wybrany) { const c = pamiec('blok_' + wybrany);
       if (c && c.indexOf('MB;') === 0 || (c && c.indexOf('\nMB;') >= 0)) { obiekty[wybrany] = { kiedy: Date.now() - 100000, zasiew: true, luka: true, status: '?' };
         zastosujPelny(wybrany, obiekty[wybrany], c); zapisz('blok z pamięci telefonu (zasiew)'); } }
-    POL.forEach(c => { zapisz(etyk(c) + 'zakres: ' + c.temat); c.polaczTeraz('start'); });
+    POL.forEach(c => { zapisz(etyk(c) + 'zakres: ' + (c.tematy || [c.temat]).join(' + ')); c.polaczTeraz('start'); });
     oddaj(!!(wybrany && obiekty[wybrany]));   /* od razu: liczby z pamięci pod zasłoną albo plansza „łączę z brokerem…" */
     /* wiek pakietu ma płynąć także między pakietami - kafel ma zblednąć, gdy obiekt zamilkł */
     setInterval(() => oddaj(false), 1000);
@@ -1711,7 +1760,8 @@
       if (!a.host || !user) return;
       const c = { nr, host: a.host, port: a.port, user,
                   pass: (nr === 2 ? (o.pass2 || o.pass) : (o.pass3 || o.pass)),
-                  temat: (nr === 2 ? (o.temat2 || o.temat) : (o.temat3 || o.temat)) };
+                  temat: (nr === 2 ? (o.temat2 || o.temat) : (o.temat3 || o.temat)),
+                  tematy: (nr === 2 ? (o.temat2 ? [o.temat2] : o.tematy) : (o.temat3 ? [o.temat3] : o.tematy)) };
       c.kl = new Klient(c.host, c.port, '/mqtt', cid + '-' + nr);
       c.stan = { stan: 'laczy', opis: 'lacze z brokerem…' };
       POL.push(c); POL.sort((x, y) => x.nr - y.nr);

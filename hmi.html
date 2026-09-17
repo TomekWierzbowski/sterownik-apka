@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'f732614663';
+window.APKA_WERSJA = '5e99b7d99e';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1604,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-17 23:06';
+window.HMI_ZBUDOWANO = '2026-09-18 00:54';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -3276,9 +3276,29 @@ window.HMI_ZBUDOWANO = '2026-09-17 23:06';
            przetwornika = kreski „— —"). Przy 0–20 mA tej różnicy nie ma
            i urwany przewód wygląda jak zero (CLAUDE.md §9.4). */
         const stoi2 = !pracujeTor(tr, i);
+        /*  ⛔ POMIAR MA PIERWSZENSTWO PRZED WYLICZANKA  [D-432, Tomasz 2026-09-17:
+              „wydaje mi sie ze ha nie odswieza encji - cisnienie mam na apce 0 bar, w ha 0,02"]
+            ═══════════════════════════════════════════════════════════════════════════════════
+            WEJSCIA:   `window.DUO_CIS` = zmierzone cisnienie ze sterownika · `stoi2` = pompa stoi
+                       · `awariaMano()` = przetwornik nie odpowiada · progi z menu serwisowego
+            CO Z CZEGO WYNIKA: gdy sterownik podal liczbe, pokazujemy JA. Wyliczanka z progow
+                       zostaje wylacznie dla makiety na biurku, gdzie zadnego sterownika nie ma.
+            WYJSCIA:   `cis2` - wartosc na kaflu manometru.
+
+            ⛔ CO BYLO ZLE: warunek `stoi2 ? 0` stal PRZED `DUO_CIS`, wiec przy stojacej pompie apka
+               nadpisywala prawdziwy odczyt zerem wpisanym z palca. Sterownik podawal 0,02 bar,
+               Home Assistant pokazywal 0,02, a apka - „0". Wygladalo to na zepsuta encje w HA
+               i wlasnie o to Tomasz zapytal; szukalibysmy usterki po zlej stronie.
+            ⚠ NISZCZYLO TO ZYWE ZERO. Przy czujniku 4-20 mA 4 mA znaczy 0 bar, a mniej niz 4 mA -
+              urwany przewod (komentarz wyzej, CLAUDE.md §9.4). To jedyny sposob, w jaki panel
+              odroznia stojaca pompe od zerwanego kabla - i podmiana odczytu na stale zero
+              zabierala mu ten sposob dokladnie wtedy, gdy byl potrzebny.
+            ⚠ POSTOJ NADAL NIE CZERWIENI KAFLA - to robi osobny warunek `!stoi2 && cisZly(cis2)`
+              przy klasie `zle`, ktory zostaje bez zmian. Postoj ma wplywac na OCENE odczytu,
+              nie na sam odczyt. */
         const cis2 = awariaMano() ? null
-                   : stoi2 ? 0
                    : (window.DUO_CIS != null ? window.DUO_CIS
+                   : stoi2 ? 0
                    : (brud2 ? _cisProgi().ostrz * 1.08        /* brudne zloze: PONAD prog */
                         : _cisProgi().ostrz * (i===0 ? 0.56 : 0.51)));
         sl += `<div class="mzest">
@@ -5839,6 +5859,15 @@ window.HMI_ZBUDOWANO = '2026-09-17 23:06';
               + '<div><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">POŁĄCZENIE</div>'
                 + '<div id="ust-st" style="margin-bottom:4px"></div><div id="ust-br" style="margin-bottom:4px"></div>'
                 + '<div id="ust-ob" style="color:#d0d4da"></div>'
+                /*  [D-433] STATUS BLEDU - JEDNO ZDANIE I CO Z TYM ZROBIC [Tomasz: „i ewentualnie
+                    status bledu"]. Pokazuje sie TYLKO wtedy, gdy cos jest nie tak; przy zdrowym
+                    laczu nie ma go wcale, zeby nie robic trzeciego wiersza z informacji „wszystko
+                    dobrze" - to juz mowia dwie kropki wyzej.
+                    ⚠ Zdanie ma konczyc sie CZYNNOSCIA, nie diagnoza. „Brak polaczenia" zostawia
+                      czlowieka z problemem; „sprawdz internet w telefonie" daje mu ruch do
+                      wykonania. Tam, gdzie zadnego ruchu nie ma (sterownik milczy), mowimy to
+                      wprost i kierujemy do serwisu - zamiast kazac czekac w nieskonczonosc. */
+                + '<div id="ust-blad" hidden style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#2a1d1d;border:1px solid #5a2f2f;color:#ffbdbd;font-size:13px;line-height:1.45"></div>'
                 + (_pwa ? '<a href="index.html?login=1" style="display:inline-block;margin-top:12px;padding:10px 16px;border-radius:10px;background:#1e6fd9;color:#fff;text-decoration:none;font-weight:600">Zmień sterownik / hasło</a>' : '')
               + '</div>'
               + '<div id="ust-brokery" hidden style="flex:0 0 auto"><div style="font-size:11px;letter-spacing:.08em;color:#8d949e;margin-bottom:6px">SERWERY</div>'
@@ -5965,9 +5994,18 @@ window.HMI_ZBUDOWANO = '2026-09-17 23:06';
         const wyd = d.wydawcy || {};
         /* BROKER */
         const ebr = document.getElementById('chmura-br');
-        const brHtml = kropkaEt('broker', br.stan === 'ok' ? KOL.ok : br.stan === 'laczy' ? KOL.czekam : KOL.zle, br.opis);
+        const brKol = br.stan === 'ok' ? KOL.ok : br.stan === 'laczy' ? KOL.czekam : KOL.zle;
+        const brHtml = kropkaEt('broker', brKol, br.opis);
         if (ebr) ebr.innerHTML = brHtml;
-        const ubr = document.getElementById('ust-br'); if (ubr) ubr.innerHTML = brHtml;   /* to samo zdanie w oknie ustawień [D-311] */
+        /*  [D-433] DLA KLIENTA TO SAMO INNYMI SLOWAMI. „Broker" to nazwa z naszego swiata, a
+            „łączę z brokerem…" i rozbicie „serwer 1: … · serwer 2: …" to jego wnetrznosci.
+            Klient ma wiedziec jedno: czy telefon ma z czym rozmawiac. Kolor jest ten sam, bo
+            stan jest ten sam - rozni sie wylacznie zdanie.
+            ⚠ Slowa „serwer" uzywamy w liczbie pojedynczej, bo klient widzi JEDNO polaczenie.
+              Ze pod spodem sa trzy, wie serwis - i tylko jemu to do czegokolwiek sluzy. */
+        const klBr = br.stan === 'ok' ? 'połączony' : br.stan === 'laczy' ? 'łączę…' : 'brak połączenia';
+        const ubr = document.getElementById('ust-br');
+        if (ubr) ubr.innerHTML = d.serwis ? brHtml : kropkaEt('serwer', brKol, klBr);   /* to samo zdanie w oknie ustawień [D-311] */
         /* SELECT: przebuduj opcje tylko gdy zmienił się zestaw obiektów / ich status i użytkownik
            właśnie nie wybiera (inaczej znów gasłoby rozwinięcie). */
         const sel = document.getElementById('chmura-sel');
@@ -6005,7 +6043,42 @@ window.HMI_ZBUDOWANO = '2026-09-17 23:06';
         } else { kolS = KOL.czekam; opisS = 'stan nieznany' + (w.wiek_s != null ? ' · ostatni pakiet ' + Math.round(w.wiek_s) + ' s temu' : ''); }
         const stHtml = kropkaEt('sterownik', kolS, opisS);
         if (stn) stn.innerHTML = stHtml;
-        const ust = document.getElementById('ust-st'); if (ust) ust.innerHTML = stHtml;
+        /*  [D-433] TO SAMO DLA KLIENTA, BEZ LICZB I BEZ TESTAMENTU. „offline (broker dostał
+            testament)" opisuje MECHANIZM - wiadomosc pozegnalna, ktora broker rozsyla za
+            milczacy sterownik. Klientowi mowi to tyle, co nic; interesuje go, czy sterownik
+            odpowiada. „online, ale ostatni pakiet 47 s temu" to dla niego ta sama sytuacja.
+            ⚠ ROZROZNIAMY JEDNAK „JESZCZE CZEKAM" OD „NIE ODPOWIADA" - bo to rozne rzeczy dla
+              czlowieka trzymajacego telefon: pierwsze znaczy „poczekaj", drugie „dzwon po serwis".
+              Zwijanie obu w jedno zdanie kazaloby dzwonic za kazdym razem po wlaczeniu apki. */
+        const klStOdp = w.status === 'offline' || (w.status === 'online' && !d.polaczony && mialDane);
+        const klSt = !d.obiekt ? 'szukam sterownika…'
+                   : (w.status === 'online' && d.polaczony) ? 'działa'
+                   : klStOdp ? 'nie odpowiada'
+                   : 'czekam na odpowiedź…';
+        const ust = document.getElementById('ust-st');
+        if (ust) ust.innerHTML = d.serwis ? stHtml : kropkaEt('sterownik', kolS, klSt);
+
+        /*  [D-433] ZDANIE O BLEDZIE - tylko dla klienta i tylko gdy jest co powiedziec.
+            Serwis ma wszystko w dzienniku lacza i w opisach per serwer, wiec jemu tego wiersza
+            nie dokladamy - byloby to trzecie miejsce mowiace o tej samej rzeczy.
+            KOLEJNOSC PYTAN IDZIE OD TEGO, CO CZLOWIEK MOZE NAPRAWIC SAM:
+              1. logowanie - naprawia w dziesiec sekund, wiec pytamy o to najpierw [D-422];
+              2. lacznosc - moze sprawdzic internet w telefonie;
+              3. sterownik milczy - tu juz nic nie zrobi i ma o tym uslyszec wprost. */
+        const ublad = document.getElementById('ust-blad');
+        if (ublad) {
+          let t = '';
+          if (!d.serwis) {
+            if (br.stan === 'blad' || /nie zna konta/.test(br.opis || ''))
+              t = 'Serwer nie zna tego konta. Otwórz „Zmień sterownik / hasło" i wpisz nazwę oraz hasło jeszcze raz.';
+            else if (br.stan !== 'ok' && br.stan !== 'laczy')
+              t = 'Brak połączenia z serwerem. Sprawdź internet w telefonie — aplikacja spróbuje sama, gdy wróci.';
+            else if (klStOdp)
+              t = 'Sterownik nie odpowiada, choć połączenie z serwerem jest. Jeśli to potrwa dłużej niż kilka minut, zgłoś to serwisowi.';
+          }
+          ublad.hidden = !t;
+          if (t && ublad.textContent !== t) ublad.textContent = t;
+        }
         /*  LISTA SERWERÓW [D-313]: pokazujemy ją dopiero, gdy są dwa - przy jednym wystarczy kropka „broker" wyżej.
             „niesie" = tym serwerem przychodzi wybrany obiekt, czyli tam jadą komendy. */
         /*  DWA WIDOKI USTAWIEN [D-366, Tomasz 2026-09-15: „zwykly uzytkownik widzi to, co zaznaczylem
@@ -6125,6 +6198,11 @@ window.HMI_ZBUDOWANO = '2026-09-17 23:06';
               try { pt.oninput && pt.oninput(); } catch (e) {} }   /* podpowiedz o szyfrowaniu od razu */
           }
         }
+        /*  [D-433] NAZWY OBIEKTU KLIENTOWI NIE POWTARZAMY - stoi juz na pasku u gory
+            (`chmura-naz`), a w oknie robila wiersz wiecej tam, gdzie maja byc dwa.
+            Serwis widzi ja dalej, bo ogladajac kilka sterownikow naraz musi wiedziec, ktorego
+            z nich dotycza te dwie kropki. */
+        { const uobS = document.getElementById('ust-ob'); if (uobS) uobS.hidden = !d.serwis; }
         const uob = document.getElementById('ust-ob');
         if (uob) uob.textContent = 'obiekt: ' + (d.obiekt ? d.obiekt.split('/').slice(1).join(' / ') : '—')
           + ((nazwaInst && nazwaInst !== user) ? ' · ' + nazwaInst : '');   /* konto serwisowe ma w „nazwie" swój login - nie powtarzamy go */
