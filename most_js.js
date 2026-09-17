@@ -772,16 +772,21 @@
         nie ma cichego siedzenia na pustym brokerze i nie ma burzy ponowień na cudzym.
         ⚠ Ponawianie i tak jest dziś odporne [D-407]: odstęp rośnie, a martwa droga nie każe
         sterownikowi wracać do nadawania oboma. Ale to zabezpieczenie, nie powód, żeby zgadywać. */
-    /*  KONTA ZAPASOWE WYLICZANE Z LOGINU GLOWNEGO [D-415, zasada „z zerem" — patrz nizej].
-        `Master0` -> `Master` i `Master2`;  `klient` -> `klient2` i `klient3`.
-        Wpisane recznie pole zawsze wygrywa z wyliczeniem. */
-    const _rdzen = String(o.user || '');
-    const _zZerem = /0$/.test(_rdzen) && _rdzen.length > 1;
-    const _kontoZap = nr => {           /* nr: 2 = pierwszy zapas, 3 = drugi */
-      if (!_rdzen) return '';
-      if (_zZerem) { const r = _rdzen.slice(0, -1); return nr === 2 ? r : r + '2'; }
-      return _rdzen + nr;
-    };
+    /*  KONTA ZAPASOWE: DO NAZWY DOKLEJA SIE NUMER SERWERA  [D-416, Tomasz 17.09]
+        ------------------------------------------------------------
+            nasz broker   `Master`   `wanna-gliczarow`      (bez cyfry = serwer glowny)
+            HiveMQ        `Master2`  `wanna-gliczarow2`     (zapas)
+            EMQX          `Master3`  `wanna-gliczarow3`     (rezerwa)
+        Haslo jest TO SAMO na wszystkich trzech brokerach danego odbiorcy, wiec apka nie musi
+        go liczyc - bierze haslo glowne, gdy rubryka zapasu zostala pusta.
+
+        ⛔ BYLA TU PRZEZ POL GODZINY ZASADA „Z ZEREM" (`Master0` -> `Master`, `Master2`) i zostala
+        cofnieta, bo WYMAGALA MYSLENIA: trzeba bylo wiedziec, ze zero znaczy „glowny", ze rdzen
+        powstaje przez odciecie zera i ze serwis liczy sie inaczej niz klient. Tu nie ma czego
+        wiedziec - jedna zasada dla wszystkich, ta sama w apce, w konsoli dostawcy i na kartce.
+        Numeracja zgadza sie przy tym ze slotami sterownika: 1 glowny, 2 zapas, 3 rezerwa.
+        ⚠ Wpisane recznie pole zawsze wygrywa z wyliczeniem - konwencja to udogodnienie, nie przymus. */
+    const _kontoZap = nr => (o.user ? o.user + nr : '');
     const _host2 = (o.host2 || '').trim();
     const _user2 = o.user2 || _kontoZap(2);
     const _pass2 = o.pass2 || o.pass;

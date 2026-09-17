@@ -60,7 +60,7 @@
       <label for="host2">Zapas 1</label>
       <input type="text" id="host2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = pobiorę ze sterownika">
       <p class="mala">Port dopisuje się po dwukropku, gdy jest inny niż zwykle: HiveMQ 8884, EMQX 8084 (dobieramy sam).</p>
-      <p class="mala">Konta zapasowe wyliczamy z Twojego loginu: login zakończony <b>zerem</b> znaczy „konto na serwerze głównym”, a zapasy to ten sam rdzeń — <b>Master0</b> → <b>Master</b> i <b>Master2</b>. Login bez zera: <b>klient</b> → <b>klient2</b> i <b>klient3</b>. Wpisane tu nazwy zawsze wygrywają.</p>
+      <p class="mala">Konta zapasowe wyliczamy z Twojego loginu — do nazwy doklejamy numer serwera: <b>Master</b> → <b>Master2</b> i <b>Master3</b>, <b>wanna-gliczarow</b> → <b>wanna-gliczarow2</b> i <b>wanna-gliczarow3</b>. Hasło jest to samo na wszystkich trzech. Wpisane tu nazwy zawsze wygrywają.</p>
       <label for="user2">Użytkownik zapasu 1</label>
       <input type="text" id="user2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pusto = wyliczam z loginu">
       <label for="pass2">Hasło zapasu 1</label>
@@ -171,14 +171,11 @@
         ale te drzwi sprawdzały tylko pierwszy - jego awaria zamykała wejście, choć drugi działał.
         Wpuszczamy, gdy KTÓRYKOLWIEK wpuści; gdy oba odmówią, pokazujemy, co powiedział pierwszy
         (a jeśli milczał - co powiedział drugi). Dane zapisujemy te same, co dotąd. */
-    /*  ⚠ TA SAMA KONWENCJA CO W APCE [D-415]: login zakonczony ZEREM znaczy „konto na serwerze
-        glownym", a zapasy to ten sam rdzen (`Master0` -> `Master`). Drzwi musza probowac TYM SAMYM
-        kontem, ktorym potem laczy sie aplikacja - inaczej wpuszczaja i zaraz odmawiaja, albo
-        odwrotnie, i czlowiek nie wie, ktore zdanie jest prawdziwe. */
-    const zapKonto = nr => { if (!user) return '';
-      return /0$/.test(user) && user.length > 1 ? (nr === 2 ? user.slice(0, -1) : user.slice(0, -1) + '2')
-                                                : user + nr; };
-    const drugi = { host: el('host2').value.trim(), user: el('user2').value.trim() || zapKonto(2),
+    /*  ⚠ TA SAMA KONWENCJA CO W APCE [D-416]: do nazwy dokleja sie numer serwera (`Master` ->
+        `Master2` na zapasowym). Drzwi musza probowac TYM SAMYM kontem, ktorym potem laczy sie
+        aplikacja - inaczej wpuszczaja i zaraz odmawiaja, albo odwrotnie, a czlowiek nie wie,
+        ktore zdanie jest prawdziwe. */
+    const drugi = { host: el('host2').value.trim(), user: el('user2').value.trim() || (user ? user + '2' : ''),
                     pass: el('pass2').value || pass };
     const proby = [{ nazwa: 'serwer 1', host: host, user: user, pass: pass }];
     if (drugi.host && drugi.user) proby.push({ nazwa: 'serwer 2', host: drugi.host, user: drugi.user, pass: drugi.pass });
