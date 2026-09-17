@@ -1278,7 +1278,13 @@
         onFailure: r => {
           const rc = rcZ(r);
           /* ZŁE DANE LOGOWANIA NIE PONAWIAJĄ SIĘ - to człowiek musi poprawić (inaczej broker blokuje konto za dobijanie) */
-          if (rc === 4 || rc === 5) { c.stan = { stan: 'blad', opis: 'broker odmówił - złe dane logowania (użytkownik/hasło)' }; zapisz(etyk(c) + 'odmowa: złe dane logowania'); oddaj(); return; }
+          /*  ⚠ POWIEDZ, JAKIM KONTEM PROBOWALES [17.09, zmierzone na stanowisku]. Konto na brokerze
+              zapasowym powstaje u innego dostawcy i czlowiek nadaje mu nazwe recznie - u nas wyszlo
+              `apka` przy apce szukajacej `apka2` (pusta rubryka znaczy „ten sam login z dwojka na
+              koncu"). Bez nazwy w komunikacie wyglada to na zle HASLO i szuka sie nie tam, gdzie
+              trzeba. Nazwa konta nie jest tajemnica - haslo nadal nigdzie nie jedzie. */
+          if (rc === 4 || rc === 5) { c.stan = { stan: 'blad', opis: 'broker odmówił konta „' + (c.user || '(bez konta)') + '" - popraw użytkownika albo hasło zapasu w ustawieniach' };
+                                      zapisz(etyk(c) + 'odmowa: broker nie zna konta „' + c.user + '" (albo hasło inne)'); oddaj(); return; }
           const powod = rc === 3 ? 'broker niedostępny' : rc === 1 || rc === 2 ? 'broker odrzucił klienta (kod ' + rc + ')'
                       : 'broker nie odpowiada (brak zasięgu?)';
           const sek = ponowPozniej('nieudana próba');
