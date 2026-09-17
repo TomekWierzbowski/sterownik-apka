@@ -834,6 +834,17 @@
     const brokerOgolem = () => {
       const c = klDla(wybrany);
       const ok = POL.filter(x => x.stan.stan === 'ok');
+      /*  ⛔ WSZYSTKIE DROGI ODMOWILY TEGO SAMEGO KONTA = JEDEN BLAD, NIE TRZY AWARIE [D-422].
+          Konta na trzech brokerach wiaze jedna nazwa [D-416], wiec skasowane albo zle wpisane
+          logowanie zabiera je razem. Trzy osobne „broker odmowil" kaza szukac trzech usterek;
+          prawda jest jedna i da sie ja naprawic w dziesiec sekund - trzeba tylko ja napisac.
+          ⚠ To NIE jest to samo, co „zaden broker nie odpowiada" (brak zasiegu): tam ponawianie
+            ma sens, tutaj konta nie przybedzie samo, wiec apka prosi czlowieka, a nie czeka. */
+      if (!ok.length && POL.length && POL.every(x => x.odmowaKonta)) {
+        return { stan: 'blad', opis: 'żaden serwer nie zna konta „' + (o.user || '') + '" - '
+                 + 'to nie awaria łącza, tylko logowanie. Otwórz „Zmień sterownik / hasło" '
+                 + 'i wpisz konto jeszcze raz' };
+      }
       if (POL.length === 1) return POL[0].stan;
       if (c && c.stan.stan === 'ok') return { stan: 'ok', opis: POL.map(x => 'serwer ' + x.nr + ': ' + x.stan.opis).join(' · ') };
       if (ok.length) return { stan: 'ok', opis: POL.map(x => 'serwer ' + x.nr + ': ' + x.stan.opis).join(' · ') };
@@ -1290,6 +1301,7 @@
         const ponownie = c.byloZerwane;
         const przerwa = (ponownie && c.zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - c.zerwaneOd) / 1000) + ' s' + (c.byloWTle ? ', telefon był w tle' : '') + ')' : '';
         c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.nieudane = 0;
+        c.odmowaKonta = false;           /* [D-422] konto jednak jest - zdejmujemy znacznik */
         c.dzialaloOd = Date.now();       /* [D-407] połączenie NAPRAWDĘ stanęło - dopiero to pozwala zerować odstęp */
         /* [D-408] krótki meldunek do serwisu - po chwili, gdy subskrypcje i wybór obiektu już stoją */
         setTimeout(() => { try { if (M.wyslijDziennik) M.wyslijDziennik(false); } catch (e) {} }, 4000);
@@ -1322,6 +1334,7 @@
             c.stan = { stan: 'blad', opis: 'broker nie zna konta „' + (c.user || '(bez konta)') + '"'
                        + (gl ? ' - zaloguj sie jeszcze raz przyciskiem „Zmien sterownik / haslo"'
                              : ' - popraw konto zapasu w zaawansowanych') };
+            c.odmowaKonta = true;                       /* [D-422] ta droga odpadla przez KONTO, nie przez lacze */
             zapisz(etyk(c) + 'odmowa: broker nie zna konta „' + c.user + '" (albo haslo inne)');
             oddaj(); return; }
           const powod = rc === 3 ? 'broker niedostępny' : rc === 1 || rc === 2 ? 'broker odrzucił klienta (kod ' + rc + ')'
