@@ -1108,6 +1108,7 @@
             zapisz(etyk(c) + 'ciężkie tematy z powrotem'); } catch (e) {} };
     const zrobDriver = c => {
       c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
+      c.dzialaloOd = 0;   /* [D-407] kiedy to połączenie NAPRAWDĘ stanęło - stąd wiadomo, czy zerować odstęp */
       const ponowPozniej = powod => {
         /* [D-345] tablica zalezy od tego, czy ktos patrzy - patrz uzasadnienie przy ODSTEPY_PATRZY */
         const widac = (typeof document === 'undefined') || document.visibilityState !== 'hidden';
@@ -1151,10 +1152,22 @@
       c.kl.onConnectionLost = r => { const co = pahoTekst(r); c.zerwaneOd = Date.now(); c.byloZerwane = true;
         c.byloWTle = (document.visibilityState === 'hidden');
         c.stan = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' };
-        if (klDla(wybrany) === c) czekamPoPowrocie = true;
+        const niosl = (klDla(wybrany) === c);   /* czy TĄ drogą przychodził wybrany obiekt [D-407] */
+        if (niosl) czekamPoPowrocie = true;
         zapisz(etyk(c) + 'zerwane: ' + co); oddaj();
-        if (M.niesieReset) M.niesieReset();   /* [D-321] padła droga, którą obiekt do nas docierał - niech sterownik wróci do nadawania oboma */
-        c.odstepNr = 0; c.polaczTeraz('zerwane');   /* od razu; gdy sieci nie ma, próba padnie i pójdą odstępy */
+        /*  ⚠ TYLKO GDY TO BYŁA DROGA, KTÓRĄ OBIEKT DOCIERAŁ [D-407, objaw zmierzony 17.09].
+            Dotąd KAŻDE zerwanie - także serwera, który nigdy nie działał - kazało sterownikowi wrócić
+            do nadawania oboma. Martwy serwer 2 robił to co dwie sekundy i szarpał tym pierwszym:
+            w dzienniku „serwer 1: połączony ponownie (przerwa 4 s)", a w apce znikające obiegi. */
+        if (niosl && M.niesieReset) M.niesieReset();
+        /*  ⚠ ODSTĘP ZERUJEMY TYLKO PO POŁĄCZENIU, KTÓRE NAPRAWDĘ DZIAŁAŁO [D-407].
+            Zerowanie przy każdym zerwaniu znaczyło, że serwer NIEOSIĄGALNY nigdy nie wchodzi
+            w odstępy - bo każda nieudana próba wygląda jak „zerwane działające połączenie"
+            i wraca na początek tablicy. Efekt: próba co 1-2 s w nieskończoność, bateria i broker
+            dobijane bez sensu. Dziesięć sekund pracy = połączenie było prawdziwe. */
+        if (c.dzialaloOd && (Date.now() - c.dzialaloOd) > 10000) c.odstepNr = 0;
+        c.dzialaloOd = 0;
+        c.polaczTeraz('zerwane');   /* od razu; gdy sieci nie ma, próba padnie i pójdą odstępy */
       };
       /*  PO KAŻDYM POŁĄCZENIU: `onSuccess` (subskrypcje - cleanSession je kasuje przy zerwaniu) leci przy KAŻDYM
           CONNACK, a `onConnected` podpisuje pasek. Czy to POWRÓT po zerwaniu, wiemy z własnej flagi `byloZerwane`
@@ -1163,6 +1176,7 @@
         const ponownie = c.byloZerwane;
         const przerwa = (ponownie && c.zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - c.zerwaneOd) / 1000) + ' s' + (c.byloWTle ? ', telefon był w tle' : '') + ')' : '';
         c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.nieudane = 0;
+        c.dzialaloOd = Date.now();       /* [D-407] połączenie NAPRAWDĘ stanęło - dopiero to pozwala zerować odstęp */
         c.ostOdbior = Date.now();        /* [D-355] swiezo polaczony - strażnik ciszy liczy od teraz */
         if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
         c.stan = { stan: 'ok', opis: ponownie ? 'połączony ponownie' + przerwa : 'połączony' };
