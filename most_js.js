@@ -1312,8 +1312,18 @@
               `apka` przy apce szukajacej `apka2` (pusta rubryka znaczy „ten sam login z dwojka na
               koncu"). Bez nazwy w komunikacie wyglada to na zle HASLO i szuka sie nie tam, gdzie
               trzeba. Nazwa konta nie jest tajemnica - haslo nadal nigdzie nie jedzie. */
-          if (rc === 4 || rc === 5) { c.stan = { stan: 'blad', opis: 'broker odmówił konta „' + (c.user || '(bez konta)') + '" - popraw użytkownika albo hasło zapasu w ustawieniach' };
-                                      zapisz(etyk(c) + 'odmowa: broker nie zna konta „' + c.user + '" (albo hasło inne)'); oddaj(); return; }
+          /*  ⚠ TEKST MA PASOWAC DO KAZDEGO SERWERA, NIE TYLKO DO ZAPASU [17.09, wieczor].
+              Pierwsza wersja pisala „popraw haslo ZAPASU" - a odmowa przyszla z serwera GLOWNEGO
+              (skasowane konto `apka`, zostalo `Master`). Czlowiek czytal o zapasie i szukal bledu
+              w rubryce, ktora akurat byla pusta i poprawna. Komunikat nazywa wiec konto i mowi,
+              gdzie sie je zmienia - „Zmien sterownik / haslo" dla glownego, „zaawansowane" dla zapasow. */
+          if (rc === 4 || rc === 5) {
+            const gl = (c.nr === 1);
+            c.stan = { stan: 'blad', opis: 'broker nie zna konta „' + (c.user || '(bez konta)') + '"'
+                       + (gl ? ' - zaloguj sie jeszcze raz przyciskiem „Zmien sterownik / haslo"'
+                             : ' - popraw konto zapasu w zaawansowanych') };
+            zapisz(etyk(c) + 'odmowa: broker nie zna konta „' + c.user + '" (albo haslo inne)');
+            oddaj(); return; }
           const powod = rc === 3 ? 'broker niedostępny' : rc === 1 || rc === 2 ? 'broker odrzucił klienta (kod ' + rc + ')'
                       : 'broker nie odpowiada (brak zasięgu?)';
           const sek = ponowPozniej('nieudana próba');
