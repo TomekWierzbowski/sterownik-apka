@@ -894,7 +894,21 @@
       if (POL.length < 2) return 0;
       const w = wybrany && obiekty[wybrany];
       const c = w && w.kl;
-      return (c && c.kl && c.kl.isConnected() && c.stan.stan === 'ok') ? (c.slot || 0) : 0;
+      if (!(c && c.kl && c.kl.isConnected() && c.stan.stan === 'ok')) return 0;
+      const nr = c.slot || 0;
+      if (!nr) return 0;
+      /*  ⛔ NIE PROSIMY O DROGE, NA KTOREJ STEROWNIKA NIE MA [D-428]. Zastany `status` z brokera,
+          z ktorego sterownik juz odszedl, potrafi zapisac te droge jako „niosaca". Wtedy prosimy
+          o ciezkie tematy WLASNIE TAM, sterownik przestaje nadawac gdziekolwiek indziej i nie
+          wysyla nic (bo go tam nie ma), a skoro nic nie przychodzi - apka nie ma jak zmienic
+          zdania. Pat podtrzymywal sie sam: „sterownik online", zaslona „pobieram stan" bez konca
+          i w dzienniku w kolko ta sama prosba.
+          ⚠ Sprawdzamy to POLEM `pol` ze spisu [D-425] - wczesniej apka nie miala tego czym
+            stwierdzic. Gdy `pol` nie ma (starsze firmware), nie zgadujemy: prosimy wszystkimi. */
+      const sp = M.ostSpisSerwerow;
+      const w2 = sp && (nr === 1 ? sp.glowny : nr === 2 ? sp.zapas1 : null);
+      if (!w2 || w2.pol !== 1) return 0;
+      return nr;
     };
     let niesieOst = -1;
     const oglos = (v, niesie) => { if (!wybrany) return;
@@ -911,7 +925,11 @@
                   if (cel && cel.lekki) { wepnijCiezkie(cel); cel.bliz = 0; } }
         tresc += ';niesie=' + nr;
         if (nr !== niesieOst) { niesieOst = nr;
-          zapisz(nr ? 'proszę o ciężkie tematy przez ' + NAZWA_DROGI(nr) : 'proszę o ciężkie tematy WSZYSTKIMI drogami'); }
+          /*  ⚠ SKUTEK, NIE MECHANIZM [D-428a, Tomasz: „zamiast «prosze o ciezkie tematy» to
+              «odbieram tematy»"]. Pod spodem to nadal dopisek `niesie=N` w `zadanie`, ktory kaze
+              sterownikowi kierowac tam `zm` i `blok` - ale czytajacy dziennik chce wiedziec, ktora
+              droga PLYNA DANE, a nie jak sie o to prosi. */
+          zapisz(nr ? 'odbieram dane przez ' + NAZWA_DROGI(nr) : 'odbieram dane WSZYSTKIMI drogami'); }
       }
       /*  ŻĄDANIE IDZIE WSZYSTKIMI DROGAMI [D-327, uwaga z audytu]: dotąd szło tylko tą, którą uważamy
           za niosącą. Gdy sterownik straci WŁAŚNIE tego brokera, prośba leci w próżnię, a sterownik
@@ -1246,10 +1264,10 @@
         żeby odróżnić „sterownik padł" od „ten broker już go nie obsługuje" (testament - D-314). */
     const CIEZKIE = ['zm', 'blok'];
     const odepnijCiezkie = c => { if (c.lekki) return; c.lekki = true;
-      try { CIEZKIE.forEach(tm => c.kl.unsubscribe(c.temat + '/' + tm)); zapisz(etyk(c) + 'odpięte ciężkie tematy - te same paczki idą drugą drogą'); } catch (e) {} };
+      try { CIEZKIE.forEach(tm => c.kl.unsubscribe(c.temat + '/' + tm)); zapisz(etyk(c) + 'przestaję tędy odbierać dane - te same paczki idą drugą drogą'); } catch (e) {} };
     const wepnijCiezkie = c => { if (!c.lekki || !c.kl.isConnected()) return; c.lekki = false;
       try { TEMATY.filter(tm => CIEZKIE.indexOf(tm[0]) >= 0).forEach(tm => c.kl.subscribe(c.temat + '/' + tm[0], { qos: tm[1] }));
-            zapisz(etyk(c) + 'ciężkie tematy z powrotem'); } catch (e) {} };
+            zapisz(etyk(c) + 'odbieram dane także tędy'); } catch (e) {} };
     const zrobDriver = c => {
       c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
       c.dzialaloOd = 0;   /* [D-407] kiedy to połączenie NAPRAWDĘ stanęło - stąd wiadomo, czy zerować odstęp */
@@ -1591,7 +1609,10 @@
       if (cz[cz.length - 1] === 'status') {
         const pref = cz.slice(0, -1).join('/');
         if (!obiekty[pref]) obiekty[pref] = { txt: '', kiedy: 0 };
-        if (!obiekty[pref].kl) obiekty[pref].kl = _zrodlo;   /* [D-313] obiekt, który tylko ogłosił status - odpowiadamy tym samym brokerem */
+        /*  ⚠ ZASTANY `status` NIE USTANAWIA DROGI [D-428]. Retained lezy na brokerze i przezywa
+            odejscie sterownika - wiec „pierwszy, ktory sie odezwal" bywa brokerem, z ktorego
+            sterownik dawno poszedl. Swiezy `status` owszem: to znaczy, ze wlasnie tam jest. */
+        if (!obiekty[pref].kl && !m.retained) obiekty[pref].kl = _zrodlo;   /* [D-313] */
         /*  STATUS JEST PER BROKER [D-314, zmierzone przy przełączaniu]: gdy sterownik przestaje korzystać z jednego
             serwera, TEN broker ogłasza „offline" z testamentu - a sterownik w najlepsze nadaje drugim. Jeden wspólny
             `status` dawał wtedy czerwoną kropkę przy żywym obiekcie. Liczymy: online, jeśli CHOĆ JEDEN broker tak mówi. */
