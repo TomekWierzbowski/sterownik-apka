@@ -116,8 +116,13 @@
   /*  [D-326] NAZWA PRZESTAJE NADPISYWAC RECZNIE WPISANEGO UZYTKOWNIKA. Konto serwisowe nazywa sie
       z wielkiej litery, a `slug()` robi z tego male litery - broker odpowiada wtedy „brak
       uprawnien" (sprawdzone na obu: HiveMQ i EMQX). Kto raz poprawi pole, ten wie, co robi. */
-  let userRecznie = false;
-  el('user').addEventListener('input', () => { userRecznie = (el('user').value.trim() !== ''); });
+  let userRecznie = false, serwRecznie = false;
+  /*  [D-484, B.0z-38] PTASZEK NIE PRZEŻYWA ZMIANY KONTA. Zapamiętany „serwisowe" zostawał po przejściu
+      z konta serwisowego na klienckie - apka zapisywała się zakresem, którego nowe konto nie ma, i sypała
+      odmowami. Dopóki człowiek sam nie dotknie ptaszka, idzie on za kształtem loginu (myślnik = klient). */
+  el('serw').addEventListener('change', () => { serwRecznie = true; });
+  el('user').addEventListener('input', () => { userRecznie = (el('user').value.trim() !== '');
+    if (!serwRecznie) el('serw').checked = (!!el('user').value.trim() && el('user').value.trim().indexOf('-') < 0); });
   el('nazwa').addEventListener('input', () => { if (!userRecznie) el('user').value = slug(el('nazwa').value); });
 
   if ('serviceWorker' in navigator) {
@@ -142,8 +147,20 @@
       celowo nie zdradzaja, ktore konta istnieja. Dawny tekst dla 5 („brak uprawnien dla tego
       uzytkownika") mowil, ze konto istnieje i brakuje mu praw - wiec czlowiek z literowka
       w hasle szukal usterki po stronie serwisu zamiast poprawic pole. */
+  /*  ⛔ DWIE RÓŻNE NUMERACJE - DWA OSOBNE SŁOWNIKI [audyt 20.09.2026].
+      Do tej pory kod brał numer błędu BIBLIOTEKI i szukał go w tablicy kodów BROKERA. Efekt:
+      przekroczony czas łączenia (Paho 1) meldował się jako „broker nie zna tej wersji
+      protokołu", a błąd wewnętrzny biblioteki (Paho 5) jako „zły login albo hasło" - człowiek
+      poprawiał hasło, które było dobre.
+      ⚠ KODY[] wolno użyć WYŁĄCZNIE wtedy, gdy liczba przyszła OD BROKERA, czyli z treści
+        odpowiedzi („return code: N"). Numer biblioteki mówi o czymś zupełnie innym. */
   const KODY = { 1: 'broker nie zna tej wersji protokołu', 2: 'odrzucony identyfikator klienta', 3: 'broker niedostępny',
                  4: 'zły login albo hasło', 5: 'zły login albo hasło' };
+  /*  Numery WŁASNE biblioteki Paho (paho-mqtt.min.js) - o awarii drogi, nie o koncie. */
+  const PAHO = { 1: 'przekroczony czas łączenia - broker nie odpowiedział', 2: 'połączenie zerwane',
+                 3: 'nie udało się otworzyć połączenia - sprawdź adres i port',
+                 4: 'brak odpowiedzi brokera', 5: 'błąd wewnętrzny aplikacji',
+                 6: 'broker odrzucił połączenie', 7: 'nieznany błąd połączenia' };
   const LOGOWANIE = rc => rc === 4 || rc === 5;
   el('f').onsubmit = ev => {
     ev.preventDefault();
@@ -181,10 +198,20 @@
         `Master2` na zapasowym). Drzwi musza probowac TYM SAMYM kontem, ktorym potem laczy sie
         aplikacja - inaczej wpuszczaja i zaraz odmawiaja, albo odwrotnie, a czlowiek nie wie,
         ktore zdanie jest prawdziwe. */
-    const drugi = { host: el('host2').value.trim(), user: el('user2').value.trim() || (user ? user + '2' : ''),
-                    pass: el('pass2').value || pass };
-    const proby = [{ nazwa: 'serwer 1', host: host, user: user, pass: pass }];
-    if (drugi.host && drugi.user) proby.push({ nazwa: 'serwer 2', host: drugi.host, user: drugi.user, pass: drugi.pass });
+    /*  ⛔ WSZYSTKIE SKONFIGUROWANE SERWERY, NIE DWA [audyt 20.09.2026]. Do tej pory drzwi
+        próbowały wyłącznie `host` i `host2`; dane zapasu 2 były zapisywane przy sukcesie, ale
+        w samym logowaniu nie brały udziału - więc gdy działał TYLKO zapas 2, nie było jak wejść,
+        chociaż HMI potrafi z niego korzystać. Jedna lista, jedne reguły: wpuszcza KTÓRYKOLWIEK.
+        ⚠ Nazwy prób są TE SAME, co etykiety pól na ekranie („Zapas 1", „Zapas 2") - wcześniej
+          komunikat mówił „serwer 2" o polu podpisanym „Zapas 1" i odsyłał człowieka do rubryki
+          o innej nazwie. */
+    const drugi  = { host: el('host2').value.trim(), user: el('user2').value.trim() || (user ? user + '2' : ''),
+                     pass: el('pass2').value || pass };
+    const trzeci = { host: el('host3').value.trim(), user: el('user3').value.trim() || (user ? user + '3' : ''),
+                     pass: el('pass3').value || pass };
+    const proby = [{ nazwa: 'serwer główny', host: host, user: user, pass: pass }];
+    if (drugi.host  && drugi.user)  proby.push({ nazwa: 'zapas 1', host: drugi.host,  user: drugi.user,  pass: drugi.pass });
+    if (trzeci.host && trzeci.user) proby.push({ nazwa: 'zapas 2', host: trzeci.host, user: trzeci.user, pass: trzeci.pass });
     let odmowy = [], ile_odp = 0, ileLog = 0;   /* ileLog: ile z nich to odmowa logowania [D-434] */
     proby.forEach(pr => {
       const a = adres(pr.host);
@@ -197,15 +224,27 @@
             koniec(true, 'Połączono (' + pr.nazwa + '). Otwieram HMI…'); },
           /* kod CONNACK brokera (4 złe hasło, 5 brak uprawnień, 3 niedostępny) jest w TREŚCI komunikatu Paho,
              errorCode to numer błędu biblioteki (6 = „Bad Connack") - stąd wyrażenie [2026-09-09] */
-          onFailure: r => { const m = /return code:\s*(\d)/i.exec((r && r.errorMessage) || ''); const rc = m ? +m[1] : (r && r.errorCode);
-            odmowy.push(pr.nazwa + ': ' + (KODY[rc] || 'nie udało się połączyć'));
-            if (LOGOWANIE(rc)) ileLog++;
+          /*  ⛔ LICZBA OD BROKERA I NUMER BIBLIOTEKI TO DWIE ROZNE RZECZY [audyt 20.09.2026].
+              `return code: N` w tresci = odpowiedz brokera (CONNACK) - tylko ona mowi cokolwiek
+              o koncie. Gdy jej nie ma, mamy WYLACZNIE numer wlasny biblioteki: o przekroczonym
+              czasie, zerwanym gniezdzie albo bledzie w nas samych. Mieszanie tych dwoch numeracji
+              kazalo czlowiekowi poprawiac haslo, ktore bylo dobre. */
+          onFailure: r => { const m = /return code:\s*(\d)/i.exec((r && r.errorMessage) || '');
+            const odBrokera = m ? +m[1] : null;
+            const opis = odBrokera !== null
+                       ? (KODY[odBrokera] || ('broker odmówił, kod ' + odBrokera))
+                       : (PAHO[r && r.errorCode] || 'nie udało się połączyć');
+            odmowy.push(pr.nazwa + ': ' + opis);
+            if (odBrokera !== null && LOGOWANIE(odBrokera)) ileLog++;
             /*  ⛔ JEDNA PRZYCZYNA - JEDNO ZDANIE [D-434]. Konta na obu serwerach wiaze ta sama
                 nazwa i to samo haslo [D-416], wiec zla wpisana para odbija sie wszedzie naraz.
                 „serwer 1: zly login albo haslo · serwer 2: zly login albo haslo" kaze szukac
                 dwoch usterek tam, gdzie jest jedna - i do poprawienia w dziesiec sekund. */
+            /*  ⚠ Zbiorcze „zle haslo" TYLKO gdy KAZDA odmowa przyszla OD BROKERA i dotyczyla
+                konta. Wczesniej wystarczylo, ze wszystkie proby padly z dowolnego powodu - wiec
+                brak zasiegu tez konczyl sie porada „popraw haslo". */
             if (++ile_odp >= proby.length)
-              koniec(false, ileLog === ile_odp
+              koniec(false, (ileLog > 0 && ileLog === ile_odp)
                      ? 'Zły login albo hasło. Sprawdź nazwę sterownika i hasło — przepisz dokładnie, razem z myślnikiem.'
                      : odmowy.join(' · ')); } });
       } catch (e) { ile_odp++; odmowy.push(pr.nazwa + ': ' + e); if (ile_odp >= proby.length) koniec(false, odmowy.join(' · ')); }

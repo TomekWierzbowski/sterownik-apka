@@ -573,10 +573,24 @@
       }
       if (Object.keys(r).length) w.r = r;
       const z = parsujLinie(txt, 'Z;');
-      if (z && z.length) { w.seq = z[0]; if (z[1]) zegar[pref] = { czas: z[1], kiedy: Date.now() }; }
+      if (z && z.length) { w.seq = z[0]; if (z[1]) zegar[pref] = { czas: z[1], kiedy: Date.now() };
+                           if (z.length > 2 && z[2] != null) w.u = z[2]; }   /* [D-481] numer uruchomienia sterownika */
       w.txt = txt;
     };
     const zegar = {};                       // prefiks -> { czas: unix sterownika, kiedy: Date.now() odbioru }
+    /*  DOSTĘPNOŚĆ TYLKO Z DRÓG, KTÓRE ŻYJĄ [D-481, audyt Astry 20.09 „spójność" P2]. `statusy` trzyma
+        ostatni `status` per broker; „online" liczy się, jeśli CHOĆ JEDEN broker tak mówi [D-314]. Ale wpis
+        z drogi, która się ZERWAŁA, to „ostatnio online", nie „teraz online" — a przeważał nad świeżym
+        „offline" z działającej drogi. Zerwany broker traci głos: jego wpis kasujemy przy zerwaniu
+        (`statusBezDrogi`), a status liczymy na nowo z tego, co zostało. Gdy nie zostało nic — „?",
+        nie „online" i nie „offline" (nie wiemy, więc nie udajemy). */
+    const przeliczStatus = w0 => {
+      const lista = Object.values(w0.statusy || {});
+      w0.status = lista.indexOf('online') >= 0 ? 'online' : (lista.indexOf('offline') >= 0 ? 'offline' : '?');
+    };
+    const statusBezDrogi = nr => {
+      for (const p in obiekty) { const w0 = obiekty[p]; if (w0 && w0.statusy && (nr in w0.statusy)) { delete w0.statusy[nr]; przeliczStatus(w0); } }
+    };
     const f0 = window.fetch.bind(window);
     window.fetch = function (u, opt) {
       const s = String(u);
@@ -1166,6 +1180,26 @@
         const w = obiekty[pref]; if (!w || !w.mb) return;          /* bez pełnego bloku nie ma na co nakładać */
         let d = null; try { d = JSON.parse(m.payloadString); } catch (e) { return; }
         if (!d) return;
+        /*  NUMER URUCHOMIENIA `u` [D-481, audyt Astry 20.09 „spójność po restarcie" P1]. Sterownik dokłada
+            do każdej paczki licznik restartów (ten sam, co w `awaria`), a do bloku trzecie pole linii Z;.
+            Dotąd restart zgadywaliśmy ze skoku numeru o ≥1000 — i myliło się w OBIE strony: mały prawdziwy
+            skok wstecz po restarcie (250 → 1) odrzucany jako „spóźniona kopia" (apka trzymała stare 28 °C,
+            choć sterownik nadawał 31), a duży fałszywy (stary retained z zapasu) przyjmowany jako restart.
+              • u < nasze  → paczka ze STAREGO uruchomienia (spóźniona, z drugiej drogi) — pomijamy;
+              • u > nasze  → NOWE uruchomienie: lustro jest z poprzedniego życia, więc prosimy o pełny blok
+                             i do jego przyjścia trzymamy zasłonę (luka); nowe wartości NAKŁADAMY — są
+                             prawdziwsze niż to, co mamy;
+              • u == nasze → zwykła numeracja niżej; spóźniona kopia = KAŻDY numer nie nowszy (bez progu 1000).
+            Bez `u` (stary wsad sterownika) zostaje dawna heurystyka skoku 1000. */
+        if (typeof d.u === 'number') {
+          if (w.u != null && d.u < w.u) { zapisz('paczka z poprzedniego uruchomienia sterownika (u ' + d.u + ' < ' + w.u + ') - pomijam'); return; }
+          if (w.u == null || d.u > w.u) {
+            zapisz(w.u == null ? 'pierwsza paczka z numerem uruchomienia u ' + d.u + ' - proszę o pełny blok'
+                               : 'sterownik uruchomiony na nowo (u ' + w.u + ' → ' + d.u + ') - proszę o pełny blok');
+            w.u = d.u; w.seq = null; w.luka = true; w.lukaOd = Date.now();
+            if (pref === wybrany) prosPelny('nowe uruchomienie');
+          }
+        }
         if (typeof d.seq === 'number') {
           /*  TA SAMA PACZKA DRUGĄ DROGĄ [D-313]: przy dwóch brokerach (i przy powtórce QoS 1) ten sam `seq`
               potrafi przyjść dwa razy. Bez tego wyglądało to jak dziura w numeracji i apka prosiła o pełny
@@ -1174,7 +1208,7 @@
               w innej kolejności (zmierzone: „luka seq 6213→6212"), a starą już mamy nałożoną. Odsiewamy każdy
               numer NIE NOWSZY od naszego - ale tylko gdy różnica jest mała; duży skok w dół to restart
               sterownika albo przewinięcie licznika i wtedy naprawdę trzeba poprosić o pełny blok. */
-          if (w.seq != null && d.seq < w.seq && w.seq - d.seq < SEQ_SKOK_RESTART) return;
+          if (w.seq != null && d.seq < w.seq && (typeof d.u === 'number' || w.seq - d.seq < SEQ_SKOK_RESTART)) return;   /* z `u` każdy numer nie nowszy = kopia [D-481] */
           if (w.seq === d.seq) {
             /*  DOWÓD, ŻE TEN BROKER JEST NADMIAROWY [D-315]: przyniósł paczkę, którą już mamy. Po pięciu takich
                 z rzędu odpinamy od niego ciężkie tematy - ale tylko wtedy, gdy NIE jest tym, który niesie obiekt. */
@@ -1205,10 +1239,28 @@
           Duży skok w dół zostaje przyjęty — to restart sterownika albo przewinięcie licznika. */
       {
         const zS = parsujLinie(m.payloadString, 'Z;');
-        const wS = obiekty[pref] && obiekty[pref].seq;
-        if (zS && zS.length && wS != null && zS[0] < wS && wS - zS[0] < SEQ_SKOK_RESTART) {
-          zapisz('spóźniony pełny blok seq ' + zS[0] + ' < ' + wS + ' - pomijam, lustro nowsze');
-          return;
+        const w0 = obiekty[pref];
+        const wS = w0 && w0.seq, wU = w0 && w0.u;
+        const zU = (zS && zS.length > 2 && zS[2] != null) ? zS[2] : null;
+        if (zS && zS.length && wS != null) {
+          if (zU != null && wU != null) {
+            /*  [D-481] Z NUMEREM URUCHOMIENIA NIE MA ZGADYWANIA: starsze uruchomienie = stary blok
+                (skądkolwiek przyszedł), to samo uruchomienie i niższy numer = spóźniona kopia. */
+            if (zU < wU) { zapisz('pełny blok z poprzedniego uruchomienia sterownika (u ' + zU + ' < ' + wU + ') - pomijam'); return; }
+            if (zU === wU && zS[0] < wS) { zapisz('spóźniony pełny blok seq ' + zS[0] + ' < ' + wS + ' (to samo uruchomienie) - pomijam, lustro nowsze'); return; }
+          } else if (zS[0] < wS && wS - zS[0] < SEQ_SKOK_RESTART) {
+            zapisz('spóźniony pełny blok seq ' + zS[0] + ' < ' + wS + ' - pomijam, lustro nowsze');
+            return;
+          }
+        }
+        /*  ZASTANY BLOK NIE ZASTĘPUJE ŻYWEGO LUSTRA [D-481, Astra „spójność" P1 przypadek 2]. Retained
+            z brokera (np. z zapasu, na którym leży komplet sprzed godzin) wolno przyjąć, gdy nie mamy
+            jeszcze żywego lustra (zasiew) ALBO gdy jest naprawdę nowszy: to samo uruchomienie i wyższy
+            numer, albo nowsze uruchomienie. Dotąd duży skok w dół uchodził za restart i stary blok
+            z zapasu nadpisywał świeży obraz z drogi głównej (30 °C → 21 °C, bez restartu sterownika). */
+        if (m.retained && w0 && w0.mb && !w0.zasiew && wS != null && zS && zS.length) {
+          const nowszy = (zU != null && wU != null) ? (zU > wU || (zU === wU && zS[0] > wS)) : (zS[0] > wS);
+          if (!nowszy) { zapisz('zastany blok (seq ' + zS[0] + (zU != null ? ', u ' + zU : '') + ') nie nowszy niż żywe lustro - pomijam'); return; }
         }
       }
       /*  ⛔ ZASTANY BLOK NIE USTANAWIA, KTO NIESIE OBIEKT  [D-419b, objaw Tomasza: „basen sie
@@ -1273,6 +1325,18 @@
         oszczedzanie baterii oraz niedobijanie brokera - tam zostaja stare odstepy.
         ⚠ Brokera i tak nie dobijemy: `polaczTeraz` pilnuje 1,5 s miedzy probami niezaleznie od tego. */
     const ODSTEPY_PATRZY = [1, 2, 3, 5];
+    /*  ⛔ ODMOWA KONTA TO NIE ZERWANE LACZE [21.09.2026, objaw z Gliczarowa].
+        ------------------------------------------------------------
+        OBJAW: „przeladowuje sie co sekunde, pokazuje OK, rozlacza sie i tak w kolko" - przy czym
+        dwa pozostale serwery dzialaly. Dziennik apki: „serwery: 1:ok 2:zerwane 3:ok".
+        PRZYCZYNA: po odmowie KONTA apka ponawiala z `ODSTEPY_PATRZY`, czyli co 5 s bez konca.
+        ⚠ Tamta tabela powstala dla zerwanego lacza i tam jest sluszna - lacze wraca samo, wiec
+          warto probowac czesto. **Konto, ktorego broker nie zna, nie pojawi sie od probowania.**
+          Moze je stworzyc tylko czlowiek, a do tego potrzebuje spokojnego ekranu i komunikatu,
+          nie migotania co piec sekund.
+        ⚠ Znacznik `odmowaKonta` zdejmuje sie przy pierwszym udanym polaczeniu [D-422], wiec po
+          poprawieniu konta apka wraca do normalnego rytmu sama - bez restartu. */
+    const ODSTEPY_KONTO = [5, 15, 30, 60, 120, 300];
     /*  [D-427a] JEDNA NAZWA DROGI dla dziennika i dla ekranu. `slot` to numer slotu STEROWNIKA
         (z tematu `serwery`), a gdy go jeszcze nie znamy - pozycja na naszej liscie polaczen.
         Trzeci adres nie jest „slotem 3": to drugi kandydat do slotu 2. */
@@ -1321,8 +1385,39 @@
     const _zapisz_sie = (c, temat, qos) => {
       try {
         c.kl.subscribe(temat, { qos: qos,
-          onFailure: () => zapisz(etyk(c) + 'bez dostępu do ' + temat + ' - to konto ogląda inną postać nazw') });
+          onSuccess: () => { c.zakresOk = (c.zakresOk || 0) + 1; },
+          onFailure: () => { c.zakresOdmowy = (c.zakresOdmowy || 0) + 1; (c.zakresOdmowyTematy || (c.zakresOdmowyTematy = [])).push(temat); } });
       } catch (e) { zapisz(etyk(c) + 'nie udało się zapisać na ' + temat); }
+    };
+    /*  JEDNO ZDANIE ZAMIAST LITANII [D-484, B.0z-38, zmierzone na PC Tomasza 19.09]. Konto KLIENCKIE
+        z zaznaczonym ptaszkiem „serwisowe" zapisuje się wzorcami `obiekt/+/…` i `basen/+/+/…`, broker
+        odrzuca każdy z osobna, a dziennik pisał dwadzieścia razy „bez dostępu do … - to konto ogląda
+        inną postać nazw". Każde zdanie prawdziwe, całość myląca: człowiek szukał w NAZWACH obiektu,
+        a przyczyną był ZAKRES KONTA (ptaszek). Teraz odmowy zbieramy i oceniamy po komplecie:
+          • wszystkie odrzucone, a login ma myślnik (kliencki) → JEDNO zdanie, także na pasku
+            (`c.stan`): „to konto jest klienckie - odznacz «serwisowe» i zaloguj się ponownie";
+          • wszystkie odrzucone, login bez myślnika → to samo zdanie o zakresie, bez odsyłania do ptaszka;
+          • część odrzucona, część przyjęta → dawne linie per temat (to naprawdę jest „inna postać nazw");
+          • i odwrotnie [B.0z-38 druga strona]: konto BEZ myślnika (serwisowe) z odznaczonym ptaszkiem
+            widzi jeden obiekt - jedna linia w dzienniku, żeby „zniknęły mi sterowniki" miało wyjaśnienie.
+        Ocena po 3 s od kompletu zapisów: SUBACK-i wracają szybko, a broker, który milczy, i tak
+        nie da żadnej odpowiedzi do oceny. */
+    const ocenZakres = c => {
+      const ok = c.zakresOk || 0, odm = c.zakresOdmowy || 0, tematy = c.zakresOdmowyTematy || [];
+      c.zakresOk = 0; c.zakresOdmowy = 0; c.zakresOdmowyTematy = [];
+      if (!odm) {
+        if (!serwisowe && String(c.user || '').indexOf('-') < 0 && ok)
+          zapisz(etyk(c) + 'konto „' + c.user + '" wygląda na serwisowe, a ptaszek „serwisowe" jest odznaczony - apka widzi tylko jeden obiekt; zaznacz go przy logowaniu, jeśli ma widzieć wszystkie');
+        return;
+      }
+      if (ok) { tematy.forEach(t => zapisz(etyk(c) + 'bez dostępu do ' + t + ' - to konto ogląda inną postać nazw')); return; }
+      const kliencki = String(c.user || '').indexOf('-') > 0;
+      const zdanie = serwisowe && kliencki
+        ? 'to konto („' + c.user + '") jest klienckie - odznacz „serwisowe" przy logowaniu i zaloguj się ponownie'
+        : 'broker odrzucił wszystkie zapisy konta „' + c.user + '" (' + odm + ') - zakres konta nie pasuje do wybranej postaci nazw';
+      zapisz(etyk(c) + zdanie);
+      c.stan = { stan: 'blad', opis: zdanie };
+      oddaj();
     };
     const odepnijCiezkie = c => { if (c.lekki) return; c.lekki = true;
       try { (c.tematy || [c.temat]).forEach(z => CIEZKIE.forEach(tm => c.kl.unsubscribe(z + '/' + tm)));
@@ -1332,12 +1427,24 @@
               .forEach(tm => _zapisz_sie(c, z + '/' + tm[0], tm[1])));
             zapisz(etyk(c) + 'odbieram dane tędy'); } catch (e) {} };
     const zrobDriver = c => {
+      /*  ZDARZENIA TYLKO OD AKTUALNEGO KLIENTA [D-483, audyt Astry 20.09 „powrót łączności" P1].
+          `odnowKlienta` buduje nowy obiekt Paho, ale stary ma nadal podpięte `onConnectionLost`,
+          `onConnected`, `onSuccess/onFailure` i odbiór. Zmierzone przez Astrę na prawdziwym Paho:
+          rozłączenie starego wołało jego `onConnectionLost` → `polaczTeraz` → stary łączył się
+          PONOWNIE, potem powstawał nowy - dwa żywe klienty na jednej drodze, a błąd gniazda starego
+          ustawiał wspólny `c.stan` na „zerwane", choć nowy działał i dostarczał świeże paczki
+          (apka: „polaczony=false" przy wieku danych 0 s). Każda obsługa zapamiętuje, KTÓREGO klienta
+          dotyczy, i milczy, gdy `c.kl` wskazuje już na innego. */
+      const kl = c.kl;
+      const moj = () => kl === c.kl;
       c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.ponowZegar = null; c.ostProba = 0;
       c.dzialaloOd = 0;   /* [D-407] kiedy to połączenie NAPRAWDĘ stanęło - stąd wiadomo, czy zerować odstęp */
       const ponowPozniej = powod => {
         /* [D-345] tablica zalezy od tego, czy ktos patrzy - patrz uzasadnienie przy ODSTEPY_PATRZY */
         const widac = (typeof document === 'undefined') || document.visibilityState !== 'hidden';
-        const tab = widac ? ODSTEPY_PATRZY : ODSTEPY;
+        /*  Kolejnosc ma znaczenie: odmowa konta bije nawet wtedy, gdy czlowiek patrzy -
+            bo patrzenie nie zmienia faktu, ze tego konta broker nie zna. */
+        const tab = c.odmowaKonta ? ODSTEPY_KONTO : (widac ? ODSTEPY_PATRZY : ODSTEPY);
         const sek = tab[Math.min(c.odstepNr, tab.length - 1)]; c.odstepNr++;
         if (c.ponowZegar) clearTimeout(c.ponowZegar);
         c.ponowZegar = setTimeout(() => { c.ponowZegar = null; c.polaczTeraz(powod); }, sek * 1000);
@@ -1374,9 +1481,12 @@
           catch (e4) { const s = ponowPozniej(powod); zapisz(etyk(c) + 'próba za ' + s + ' s (' + pahoTekst(e4) + ')'); }
         }
       };
-      c.kl.onConnectionLost = r => { const co = pahoTekst(r); c.zerwaneOd = Date.now(); c.byloZerwane = true;
+      c.kl.onConnectionLost = r => { const co = pahoTekst(r);
+        if (!moj()) { zapisz(etyk(c) + 'zerwanie WYCOFANEGO klienta (' + co + ') - pomijam, nowy klient działa dalej'); return; }   /* [D-483] */
+        c.zerwaneOd = Date.now(); c.byloZerwane = true;
         c.byloWTle = (document.visibilityState === 'hidden');
         c.stan = { stan: 'zerwane', opis: 'zerwane: ' + co + ' - łączę ponownie…' };
+        statusBezDrogi(c.nr);            /* [D-481] zerwana droga traci głos w „online/offline" obiektów */
         const niosl = (klDla(wybrany) === c);   /* czy TĄ drogą przychodził wybrany obiekt [D-407] */
         if (niosl) czekamPoPowrocie = true;
         zapisz(etyk(c) + 'zerwane: ' + co); oddaj();
@@ -1398,6 +1508,7 @@
           CONNACK, a `onConnected` podpisuje pasek. Czy to POWRÓT po zerwaniu, wiemy z własnej flagi `byloZerwane`
           - Paho przy `reconnect:false` zawsze podaje „pierwsze połączenie" [D-310]. */
       c.kl.onConnected = () => {
+        if (!moj()) { zapisz(etyk(c) + 'połączył się WYCOFANY klient - rozłączam go, nowy ma pierwszeństwo'); try { kl.disconnect(); } catch (e) {} return; }   /* [D-483] */
         const ponownie = c.byloZerwane;
         const przerwa = (ponownie && c.zerwaneOd) ? ' (przerwa ' + Math.round((Date.now() - c.zerwaneOd) / 1000) + ' s' + (c.byloWTle ? ', telefon był w tle' : '') + ')' : '';
         c.zerwaneOd = 0; c.byloWTle = false; c.byloZerwane = false; c.odstepNr = 0; c.nieudane = 0;
@@ -1424,10 +1535,14 @@
         oddaj();
       };
       c.opcje = { useSSL: true, userName: c.user, password: c.pass, timeout: 10, keepAliveInterval: 30, cleanSession: true, reconnect: false,
-        onSuccess: () => { c.lekki = false; c.bliz = 0;
+        onSuccess: () => { if (!moj()) return;   /* [D-483] */
+                           c.lekki = false; c.bliz = 0;
+                           c.zakresOk = 0; c.zakresOdmowy = 0; c.zakresOdmowyTematy = [];
                            (c.tematy || [c.temat]).forEach(z => TEMATY.forEach(tm => _zapisz_sie(c, z + '/' + tm[0], tm[1])));
+                           setTimeout(() => { if (moj()) ocenZakres(c); }, 3000);   /* [D-484] jedno zdanie o zakresie konta */
                            if (wybrany) oglos(tempo); },
         onFailure: r => {
+          if (!moj()) return;   /* [D-483] nieudana próba WYCOFANEGO klienta nie planuje ponowień ani nie zmienia stanu */
           const rc = rcZ(r);
           /* ZŁE DANE LOGOWANIA NIE PONAWIAJĄ SIĘ - to człowiek musi poprawić (inaczej broker blokuje konto za dobijanie) */
           /*  ⚠ POWIEDZ, JAKIM KONTEM PROBOWALES [17.09, zmierzone na stanowisku]. Konto na brokerze
@@ -1480,12 +1595,19 @@
         i nowa sesja; przy `cleanSession:true` kosztuje to komplet subskrypcji od nowa. Odnawiamy
         przy POWROCIE NA EKRAN (czlowiek patrzy i czeka) oraz po serii nieudanych prob w tle. */
     const odnowKlienta = c => {
-      try { const g = c.gniazdo; if (g && g.close) g.close(); } catch (e) {}
-      try { if (c.kl && c.kl.isConnected()) c.kl.disconnect(); } catch (e) {}
-      c.gniazdo = null; c.nieudane = 0;
+      /*  KOLEJNOŚĆ MA ZNACZENIE [D-483]: NAJPIERW nowy klient staje się `c.kl` i znika zaplanowane
+          ponowienie, DOPIERO POTEM zamykamy starego. Wtedy jego `onConnectionLost` (Paho woła je
+          także przy zwykłym `disconnect()`) trafia w straż `moj()` i nie robi nic - a dotąd
+          uruchamiał drugie połączenie tego samego starego obiektu. */
       const nowy = 'hmi-' + Math.random().toString(16).slice(2, 10) + (c.nr > 1 ? '-' + c.nr : '');
-      try { c.kl = new Klient(c.host, c.port, '/mqtt', nowy); }
+      let nowyKl;
+      try { nowyKl = new Klient(c.host, c.port, '/mqtt', nowy); }
       catch (e) { zapisz(etyk(c) + 'nie udalo sie zbudowac klienta: ' + e.message); return false; }
+      const stary = c.kl, gniazdo = c.gniazdo;
+      if (c.ponowZegar) { clearTimeout(c.ponowZegar); c.ponowZegar = null; }
+      c.kl = nowyKl; c.gniazdo = null; c.nieudane = 0;
+      try { if (gniazdo && gniazdo.close) gniazdo.close(); } catch (e) {}
+      try { if (stary && stary.isConnected()) stary.disconnect(); } catch (e) {}
       zrobDriver(c);
       podepnijOdbior(c);        /* [D-359] bez tego nowy klient jest „polaczony", ale gluchy */
       c.odstepNr = 0;
@@ -1692,8 +1814,7 @@
             `status` dawał wtedy czerwoną kropkę przy żywym obiekcie. Liczymy: online, jeśli CHOĆ JEDEN broker tak mówi. */
         const w0 = obiekty[pref]; const st = (m.payloadString || '').trim() || '?';
         (w0.statusy || (w0.statusy = {}))[_zrodlo.nr] = st;
-        const lista = Object.values(w0.statusy);
-        w0.status = lista.indexOf('online') >= 0 ? 'online' : (lista.indexOf('offline') >= 0 ? 'offline' : '?');
+        przeliczStatus(w0);                                  /* tylko z dróg, które żyją [D-481] */
         /*  ⛔ AUTOMATYCZNY WYBOR WOLI OBIEKT, KTORY ZYJE  [D-419, objaw Tomasza: „brak sterownika"
             przy dzialajacym basenie - apka otwarla sadzawke, ktora wlasnie padla]
             Dotad brany byl PIERWSZY obiekt, ktory ogłosil status, bez patrzenia, CO ten status mowi.
@@ -1724,7 +1845,9 @@
     „polaczony", wykonuje komplet subskrypcji, a ZADNA wiadomosc nie dociera do aplikacji - ekran zostaje
     na ostatnim stanie i nic tego nie zglasza. Poprawka D-354 psula wiec to, co miala naprawic.
     ⚠ Dlatego podpiecie ma jedna nazwe i jest wolane w OBU drogach: przy starcie i w `odnowKlienta`. */
-    const podepnijOdbior = c => { c.kl.onMessageArrived = m => { _zrodlo = c; c.ostOdbior = Date.now(); _obsluga(m); }; };
+    const podepnijOdbior = c => { const kl = c.kl;
+      c.kl.onMessageArrived = m => { if (kl !== c.kl) return;   /* [D-483] spóźniona paczka wycofanego klienta */
+                                     _zrodlo = c; c.ostOdbior = Date.now(); _obsluga(m); }; };
     POL.forEach(podepnijOdbior);
 
     /*  ZAPASY BIERZEMY ZE STEROWNIKA, NIE ZGADUJEMY  [D-411, Tomasz 2026-09-17: „można w apce dać
