@@ -748,7 +748,13 @@
                              lacze: czekamPoPowrocie || broker.stan !== 'ok',
                              blad: (broker.stan === 'ok' || broker.stan === 'laczy') ? null : broker.opis }); };
     /* ostatnio wybrany obiekt pamietany w telefonie - przy dwu obiektach apka otwiera ten, na ktory patrzono */
-    const pamiec = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    /*  KLUCZE PAMIĘCI TELEFONU Z PRZEDROSTKIEM APKI [izolacja TEST2, 23.09]: apka klienta i TEST2 siedzą
+        pod jednym origin (GitHub Pages), a localStorage jest per origin - bez przedrostka logowanie
+        w TEST2 nadpisywało konto klienta, a „ostatni obiekt" i bloki na zimny start były wspólne.
+        `window.APKA_KLUCZ` ustawia zbuduj_pwa.py ('' klient, 'test2:' TEST2); most i strona na AP go nie
+        mają - tam przedrostek jest pusty i nic się nie zmienia. */
+    const KL = k => ((typeof window !== 'undefined' && window.APKA_KLUCZ) || '') + k;
+    const pamiec = k => { try { return localStorage.getItem(KL(k)); } catch (e) { return null; } };
     let wybrany = o.obiekt || pamiec('mqtt_obiekt') || null;
     /*  [D-419] Czy wybor jest CZLOWIEKA (z adresu, z pamieci telefonu albo z listy na pasku),
         czy nasz - automatyczny. Tylko ten drugi wolno nam zmienic, gdy obiekt okaze sie martwy. */
@@ -1281,7 +1287,7 @@
           w ~0,5 s. Bez tego dotknięcie w pierwszej sekundzie po otwarciu szło na starym stanie
           (sonda: dwa kliknięcia = jedno przełączenie, ekran odwrotnie niż sterownik). */
       if (m.retained) { obiekty[pref].kiedy = Date.now() - 100000; obiekty[pref].zasiew = true; zapisz('retained blok ' + pref.split('/').slice(1).join('/') + ' - czekam na świeży'); }
-      else { obiekty[pref].zasiew = false; obiekty[pref].luka = false; try { localStorage.setItem('blok_' + pref, m.payloadString); } catch (e) {}   /* pamięć na zimny start [C4] */
+      else { obiekty[pref].zasiew = false; obiekty[pref].luka = false; try { localStorage.setItem(KL('blok_' + pref), m.payloadString); } catch (e) {}   /* pamięć na zimny start [C4] */
              if (pref === wybrany) { ost.blok = Date.now(); czekamPoPowrocie = false; odnotujZmiane(); } }
       zapisz('pełny blok ' + pref.split('/').slice(1).join('/') + ' ' + m.payloadString.length + ' B seq ' + obiekty[pref].seq + (m.retained ? ' (retained)' : ''));
       if (!wybrany) { wybrany = pref; oglos(tempo); }
@@ -1664,7 +1670,7 @@
 
     M.wybierzObiekt = pref => { if (obiekty[pref]) { wybrany = pref; wybranyRecznie = true;
       M.ostSpisSerwerow = _spisWybrany(pref);     /* [D-429] spis idzie za wybranym obiegiem */
-      try { localStorage.setItem('mqtt_obiekt', pref); } catch (e) {} oglos(tempo); oddaj(true); } };
+      try { localStorage.setItem(KL('mqtt_obiekt'), pref); } catch (e) {} oglos(tempo); oddaj(true); } };
     /*  SPRAWDŹ PIN [2026-09-09, Tomasz: „PIN do serwisu taki, jaki jest ustawiony w sterowniku"]:
         publikuje `pin=` bez `w=` (sterownik nic nie zapisuje, tylko odpowiada, czy PIN pasuje).
         Kod 0 → PIN dobry, zapamiętujemy go do kolejnych zmian serwisowych (bez pytania drugi raz).
@@ -1872,9 +1878,9 @@
           wlasnie dziala - zapisujemy na nastepne uruchomienie i mowimy o tym w dzienniku. Podmiana
           w locie dotyczy tylko polaczen, ktore i tak nie stoja. */
     const zapiszUstawienie = (pole, wart) => {
-      try { const z = JSON.parse(localStorage.getItem('odbior_mqtt') || 'null');
+      try { const z = JSON.parse(localStorage.getItem(KL('odbior_mqtt')) || 'null');
             if (!z || z[pole] === wart) return false;
-            z[pole] = wart; localStorage.setItem('odbior_mqtt', JSON.stringify(z)); return true;
+            z[pole] = wart; localStorage.setItem(KL('odbior_mqtt'), JSON.stringify(z)); return true;
       } catch (e) { return false; }   /* logowanie bez „zapamietaj" - polaczymy sie mimo to, tylko na ten raz */
     };
     const dodajSerwer = (nr, host, powod) => {

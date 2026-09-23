@@ -2,14 +2,18 @@
    żeby HMI otwierało się od razu i bez zasięgu (dane z brokera i tak wymagają sieci -
    bez niej ekran pokazuje ostatni stan z napisem „czekam na pakiet”). Nowa wersja
    plików = nowa nazwa pamięci (WERSJA z odcisku treści) -> stare kopie znikają. */
-const WERSJA = 'basen-hmi-c6b3dba320';
+/* RODZINA = nazwy cache TEJ apki; SW kasuje przy aktywacji TYLKO swoją rodzinę [izolacja TEST2, 23.09]:
+   klient i TEST2 siedzą pod jednym origin (GitHub Pages), więc filtr „wszystko poza moją wersją"
+   kasował cache drugiej apki i zostawiał ją bez plików do startu offline (zmierzone przez Astrę). */
+const RODZINA = 'basen-hmi-';
+const WERSJA = RODZINA + 'c168e95205';
 const PLIKI = ['./', './index.html', './hmi.html', './most_js.js', './paho-mqtt.min.js',
                './manifest.webmanifest', './ikona-192.png', './ikona-512.png', './ikona-maskable-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(WERSJA).then(c => c.addAll(PLIKI)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== WERSJA).map(k => caches.delete(k))))
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== WERSJA && k.startsWith(RODZINA)).map(k => caches.delete(k))))
               .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {

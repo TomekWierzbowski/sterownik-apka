@@ -1113,7 +1113,8 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'c6b3dba320';
+window.APKA_WERSJA = 'c168e95205';
+window.APKA_KLUCZ = '';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
     navigator.serviceWorker.getRegistration().then(function (r) { if (r) { try { r.update(); } catch (e) {} } }).catch(function () {}); });
@@ -1604,7 +1605,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-18 00:54';
+window.HMI_ZBUDOWANO = '2026-09-23 15:50';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -5787,10 +5788,13 @@ window.HMI_ZBUDOWANO = '2026-09-18 00:54';
   const _q = new URLSearchParams(location.search);
   if (_chmura) {
     const start = () => {
-      let z = null; try { z = JSON.parse(localStorage.getItem('odbior_mqtt') || 'null'); } catch(e){}
+      /* KLUCZ Z PRZEDROSTKIEM APKI [izolacja TEST2, 23.09]: `window.APKA_KLUCZ` ('' klient, 'test2:' TEST2)
+         wstawia zbuduj_pwa.py; na moście i na AP go nie ma - przedrostek pusty, klucze jak dotąd. */
+      const _KL = k => ((window.APKA_KLUCZ) || '') + k;
+      let z = null; try { z = JSON.parse(localStorage.getItem(_KL('odbior_mqtt')) || 'null'); } catch(e){}
       /* APLIKACJA (PWA, D-270): dane logowania zbiera strona startowa index.html;
          prompt() w zainstalowanej aplikacji wygląda jak awaria. `pwa` ustawia index.html. */
-      let _pwa = false; try { _pwa = localStorage.getItem('pwa') === '1'; } catch(e){}
+      let _pwa = false; try { _pwa = localStorage.getItem(_KL('pwa')) === '1'; } catch(e){}
       if (_pwa && !(z && z.user && z.pass) && !_q.get('user')) { location.replace('index.html?login=1'); return; }
       const host = (z && z.host) || _q.get('host') || 'c5927e26d92d41508c1ea56fea1b6be2.s1.eu.hivemq.cloud';
       const user = _q.get('user') || (z && z.user) || prompt('MQTT - użytkownik (do podglądu):', 'podglad');
@@ -6213,6 +6217,10 @@ window.HMI_ZBUDOWANO = '2026-09-18 00:54';
            po odpięciu USB (D-206): liczby zostają, pasek czerwienieje, na ekranie wpis alarmu
            z powodem i wiekiem. Plansza zasłania wyłącznie DEMO - do pierwszych prawdziwych liczb. */
         if (d.polaczony && d.swiat) mialDane = true;
+        /* NARZĘDZIA STANOWISKA TYLKO PRZY TESTERZE [Tomasz 23.09, Katowice: „w HMI jest okienko za dużo —
+           matryca prób HIL"]. Most mówi w pakiecie, czy ma tester; bez niego menu serwisu nie pokazuje
+           wierszy stanowiskowych (patrz „Matryca prób HIL" w panel4_serwis.html). Most na obiekcie = false. */
+        window.MOST_TESTER = !!d.tester;
         /* zasłona łączenia: tylko gdy mamy już dane (przed nimi jest plansza), a broker zerwany albo
            czekamy na pierwszą paczkę po powrocie z tła */
         const zaslona = document.getElementById('chmura-lacze');
@@ -7330,7 +7338,10 @@ function ekrSerwis(){
     ${/* ⚠ NIE W CHMURZE [Tomasz 2026-09-09: „menu, którego nie powinno tam być — matryca prób HIL"]:
           apka też nazywa się hmi.html, a pliku matrycy przy niej nie ma; to narzędzie stanowiska,
           nie serwisu z telefonu. Zostaje wyłącznie pod mostem. */''}
-    ${(!SRV_CHMURA && /\.html$/i.test(location.pathname)) ? `<div class="mrow" onclick="window.open('matryca_testow.html','_blank')"><span class="t">Matryca prób HIL<i>które próby przeszły, jakie były poprawki, formularz do dopisywania — otwiera się w nowej karcie</i></span><span class="ch">›</span></div>` : ''}
+    ${/* ⚠ TYLKO GDY MOST MA TESTER [Tomasz 23.09, Katowice: „w HMI jest okienko za dużo — matryca prób HIL"]:
+          most serwisowy na obiekcie (bez `--tester`) nie ma stanowiska, więc i wiersza nie ma. Flaga
+          `MOST_TESTER` przychodzi w pakiecie SSE (panel4_hala.html); na warsztacie z `--tester COM10` = true. */''}
+    ${(!SRV_CHMURA && window.MOST_TESTER && /\.html$/i.test(location.pathname)) ? `<div class="mrow" onclick="window.open('matryca_testow.html','_blank')"><span class="t">Matryca prób HIL<i>które próby przeszły, jakie były poprawki, formularz do dopisywania — otwiera się w nowej karcie</i></span><span class="ch">›</span></div>` : ''}
   </div>` + pasek('SERWIS', 'start');
 }
 /* RESET LICZNIKÓW WODY [D-138]: lokalnie zera (żeby było widać od razu),
