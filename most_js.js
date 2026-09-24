@@ -105,6 +105,32 @@
     return [(slDo || []).map(w => mapaNazwa(w, MAPA_KOD_DO, obiegiIle)),
             (slDi || []).map(w => mapaNazwa(w, MAPA_KOD_DI, obiegiIle))];
   }
+  /*  WŁASNE NAZWY KANAŁÓW [D-493]: rejestry 4140 + 10*kanał, 2 bajty UTF-8 na słowo (starszy pierwszy),
+      19 bajtów + zero. Pusta = ekran pisze nazwę fabryczną; niepusta = „Gejzer (Atrakcja 1)". */
+  const AKC_NAZWY_REJ = 4140, AKC_NAZWA_SLOW = 10, AKC_NAZWA_MAX_B = 19;
+  function nazwaNaSlowa(tekst) {
+    let b = new TextEncoder().encode(String(tekst || '').trim());
+    if (b.length > AKC_NAZWA_MAX_B) {                      /* nie tniemy w pół litery */
+      let n = AKC_NAZWA_MAX_B; while (n > 0 && (b[n] & 0xC0) === 0x80) n--; b = b.slice(0, n);
+    }
+    const out = [];
+    for (let i = 0; i < AKC_NAZWA_SLOW; i++) out.push(((b[2 * i] || 0) << 8) | (b[2 * i + 1] || 0));
+    return out;
+  }
+  function akcNazwyZRej(g) {
+    const out = []; let jest = false;
+    for (let k = 0; k < 16; k++) {
+      const b = [];
+      for (let i = 0; i < AKC_NAZWA_SLOW; i++) {
+        const v = g(AKC_NAZWY_REJ + k * AKC_NAZWA_SLOW + i);
+        if (v === null) break; jest = true;
+        const a = (v >> 8) & 255, c = v & 255;
+        if (!a) break; b.push(a); if (!c) break; b.push(c);
+      }
+      out.push(b.length ? new TextDecoder().decode(new Uint8Array(b)) : '');
+    }
+    return jest ? out : null;
+  }
   function akcNastawyZMn(slowo) {
     if (slowo(68) === null) return null;
     const out = [];
@@ -272,6 +298,7 @@
     out.nastawy = nast;
     const lo = g(3061 + 2 * o), hi = g(3062 + 2 * o);
     if (lo !== null) out.sr_mies = ((hi || 0) << 16) | lo;
+    const naz = akcNazwyZRej(g); if (naz) out.akc_naz = naz;   /* [D-493] */
     return out;
   }
   /* obieg z bloku: pierwszy, ktory istnieje (most dostaje --obieg; na AP wynika z bloku) */
@@ -324,6 +351,13 @@
     }
     if (co === 'nastawa') {
       const i = w.indexOf(':'); if (i < 0) return { blad: 'format: wart="klucz:wartosc"' };
+      const mNaz = /^akc(\d+)_nazwa$/.exec(w.slice(0, i));       /* [D-493] nazwa = dziesięć słów */
+      if (mNaz) {
+        const k = parseInt(mNaz[1], 10); if (!(k >= 0 && k < 16)) return { blad: 'kanał poza zakresem' };
+        if (new TextEncoder().encode(w.slice(i + 1).trim()).length > AKC_NAZWA_MAX_B)
+          return { blad: 'nazwa za długa - najwyżej ' + AKC_NAZWA_MAX_B + ' bajtów (polska litera liczy się podwójnie)' };
+        return { zapisy: nazwaNaSlowa(w.slice(i + 1)).map((s, j) => [AKC_NAZWY_REJ + k * AKC_NAZWA_SLOW + j, s]) };
+      }
       const para = nastawaNaRejestr(w.slice(0, i), w.slice(i + 1), o);
       return para ? { zapisy: [para] } : { blad: 'nieznana nastawa: ' + w.slice(0, i) };
     }
@@ -371,6 +405,8 @@
     /* pobierz rejestry /rej po 16 (jak most po USB) do M.ost.rej */
     async rejestry(o) {
       const zakresy = [[4300 + o * 60, 56], [4500 + o * 10, 7], [4560 + o * 20 + 1, 1], [4024, 28], [3061 + 2 * o, 2]];
+      /* nazwy kanałów [D-493] - 160 słów, rzadko się zmieniają: co minutę, nie co 10 s */
+      if (!M.ost.nazwyMs || Date.now() - M.ost.nazwyMs > 60000) { zakresy.push([AKC_NAZWY_REJ, 160]); M.ost.nazwyMs = Date.now(); }
       const c = Object.assign({}, M.ost.rej);
       for (const [adr, ile] of zakresy) {
         for (let start = adr; start < adr + ile; start += 16) {
@@ -572,6 +608,7 @@
         for (let i = 0; i < n && 2 + i < p.length; i++) r[a0 + i] = +p[2 + i];
       }
       if (Object.keys(r).length) w.r = r;
+      if (nazwyR[pref]) { if (!w.r) w.r = {}; Object.assign(w.r, nazwyR[pref]); }   /* nazwy kanałów spoza bloku [D-493] */
       const z = parsujLinie(txt, 'Z;');
       if (z && z.length) { w.seq = z[0]; if (z[1]) zegar[pref] = { czas: z[1], kiedy: Date.now() };
                            if (z.length > 2 && z[2] != null) w.u = z[2]; }   /* [D-481] numer uruchomienia sterownika */
@@ -668,6 +705,10 @@
       });
     };
     const obiekty = {};                 /* prefiks -> {txt, kiedy, status} */
+    /*  WŁASNE NAZWY KANAŁÓW [D-493]: temat `nazwy` (retained, „kanał;nazwa" w liniach) zamieniamy na słowa
+        rejestrów 4140+ - te same, które strona na AP czyta z /rej - i doklejamy do lustra przy każdym pełnym
+        bloku (blok podmienia całe `w.r`). Dekodowanie jest jedno: dodatki() → akc_naz. */
+    const nazwyR = {};                  /* prefiks -> {adres: słowo} */
     const zdarzenia = {};               /* prefiks -> {ile, zgubione, wpisy[[czas,kat,kod,zr,ob,a,b,c]]} [D-295] */
     let czekaPliki = null, czekaPlik = null;                      /* prośby o listę / plik z karty SD [D-297] */
     let czekaZapas = null;                                        /* [D-412] kto czeka na meldunek o rezerwie */
@@ -1167,6 +1208,18 @@
         if (pref === wybrany) oddaj(true);
         return;
       }
+      if (rodzaj === 'nazwy') {                                       /* [D-493] */
+        const pref = cz.slice(0, -1).join('/'); const r = {};
+        for (const l of m.payloadString.split('\n')) {
+          const i = l.indexOf(';'); if (i < 0) continue;
+          const k = parseInt(l.slice(0, i), 10); if (!(k >= 0 && k < 16)) continue;
+          nazwaNaSlowa(l.slice(i + 1)).forEach((s, j) => { r[AKC_NAZWY_REJ + k * AKC_NAZWA_SLOW + j] = s; });
+        }
+        nazwyR[pref] = r;
+        const w = obiekty[pref]; if (w && w.r) Object.assign(w.r, r);
+        if (pref === wybrany) oddaj(true);
+        return;
+      }
       if (rodzaj === 'wynik') {
         let w = {}; try { w = JSON.parse(m.payloadString); } catch (e) { w = { kod: 1, opis: m.payloadString }; }
         const r = { ok: w.kod === 0, kod: w.kod, opis: w.opis || (w.kod === 0 ? 'wykonano' : 'odmowa') };
@@ -1354,7 +1407,7 @@
         dziennik, karta SD), qos 0 tam, gdzie i tak przyjdzie następna (blok, stan, status, wynik). */
     const TEMATY = [['blok', 0], ['zm', 1], ['status', 0], ['wynik', 0], ['stan', 0],
                     ['zdarzenia', 1], ['zd', 1], ['pliki', 1], ['plik', 1], ['okres', 1],
-                    ['serwery', 0], ['zapas', 0]];
+                    ['serwery', 0], ['zapas', 0], ['nazwy', 1]];   /* [D-493] nazwy kanałów, retained */
     /*  [D-411] `serwery` = spis brokerow prosto ze sterownika (retained, przyjdzie od razu).
         [D-412] `zapas`  = MELDUNKI O REZERWIE, po polsku, pisane przez sterownik. To jedyna droga,
         ktora mowi, co sie stalo z rozkazem `zapas:...` - odpowiedzi NIE MA w temacie `wynik`

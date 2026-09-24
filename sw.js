@@ -6,7 +6,7 @@
    klient i TEST2 siedzą pod jednym origin (GitHub Pages), więc filtr „wszystko poza moją wersją"
    kasował cache drugiej apki i zostawiał ją bez plików do startu offline (zmierzone przez Astrę). */
 const RODZINA = 'basen-hmi-';
-const WERSJA = RODZINA + 'c168e95205';
+const WERSJA = RODZINA + '71af939bca';
 const PLIKI = ['./', './index.html', './hmi.html', './most_js.js', './paho-mqtt.min.js',
                './manifest.webmanifest', './ikona-192.png', './ikona-512.png', './ikona-maskable-512.png'];
 self.addEventListener('install', e => {

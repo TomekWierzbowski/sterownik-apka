@@ -1113,7 +1113,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = 'c168e95205';
+window.APKA_WERSJA = '71af939bca';
 window.APKA_KLUCZ = '';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
@@ -1605,7 +1605,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-23 15:50';
+window.HMI_ZBUDOWANO = '2026-09-24 13:26';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -1705,7 +1705,9 @@ window.HMI_ZBUDOWANO = '2026-09-23 15:50';
     for (let k = 0; k < 6; k++){
       if (!((ist >> k) & 1)) continue;
       const n = nast[baza + k] || null;
-      out.push({ n: AKC_NAZWY_HALA[k], ik: AKC_IKONY[k],
+      /* własna nazwa ze sterownika [D-493]: „Gejzer (masaż wodny 1)" */
+      const wlasna = (window.DUO_AKC_NAZ && window.DUO_AKC_NAZ[baza + k]) || '';
+      out.push({ n: wlasna ? wlasna + ' (' + AKC_NAZWY_HALA[k] + ')' : AKC_NAZWY_HALA[k], ik: AKC_IKONY[k],
                  czas: (n && n.czas) ? n.czas : 15*60, kanal: k });
     }
     return out;
@@ -5619,6 +5621,7 @@ window.HMI_ZBUDOWANO = '2026-09-23 15:50';
       if (d.akc_ist !== undefined)  window.DUO_AKC_IST = d.akc_ist;
       if (d.akc_wl !== undefined)   window.DUO_AKC_WL  = d.akc_wl;
       if (d.akc_nast !== undefined) window.DUO_AKC_NAST = d.akc_nast;
+      if (d.akc_naz !== undefined)  window.DUO_AKC_NAZ  = d.akc_naz;    /* własne nazwy kanałów [D-493] */
       if (d.akc_prac !== undefined && d.akc_prac !== null)
         window.DUO_AKC_PRAC = d.akc_prac;
         /* stan swiatla ZE STEROWNIKA (kanal 6/7 maski pracy) [D-208]
@@ -8111,6 +8114,53 @@ const AKC_NAZWY = ['Masaż wodny 1','Masaż wodny 2',
                    'Atrakcja 1','Atrakcja 2',
                    'Oświetlenie białe','Oświetlenie barwne'];
 
+/* WŁASNE NAZWY KANAŁÓW [D-493, Tomasz 2026-09-24: „pasowałoby, żeby gdzieś można było wpisać nazwę,
+   co to jest ten kanał"; wyświetlanie „własna (fabryczna)"]. Nazwa leży w sterowniku (rejestry 4140+,
+   nastawa `akc<k>_nazwa`), więc panel, apka, most i webhmi pokazują to samo. Pusta = fabryczna.
+   Limit 19 bajtów UTF-8 - polska litera liczy się podwójnie. */
+const AKC_NAZWA_MAX_B = 19;
+function akcNazwa(k){
+  const f = AKC_NAZWY[k % 8] || ('kanał ' + k);
+  const w = (SRV_S.akc_naz && SRV_S.akc_naz[k]) || '';
+  return w ? w + ' (' + f + ')' : f;
+}
+let AKC_NAZ_EDYT = -1;                 /* kanał z otwartym polem nazwy, -1 = żaden */
+/* wiersz nazwy w ekranie akcesoriów: odczyt albo pole do wpisania (zwykłe łączenie tekstów -
+   zagnieżdżone szablony myliły straznika kolizji zbuduj_hmi.py) */
+function akcNazwaWiersz(k){
+  const biez = (SRV_S.akc_naz && SRV_S.akc_naz[k]) || '';
+  const esc = t => String(t).split('&').join('&amp;').split('"').join('&quot;').split('<').join('&lt;');
+  if (AKC_NAZ_EDYT !== k)
+    return '<div class="mrow" onclick="akcNazwaEdytuj(' + k + ')">'
+         + '<span class="t">Nazwa na obiekcie</span>'
+         + '<span class="w">' + (biez ? esc(biez) : '—') + '</span><span class="ch">›</span></div>';
+  return '<div class="mrow">'
+       + '<input id="akcNazIn" type="text" maxlength="40" placeholder="' + esc(AKC_NAZWY[k % 8]) + '"'
+       + ' value="' + esc(biez) + '" onkeydown="akcNazwaKlawisz(event,' + k + ')"'
+       + ' style="flex:1;font:inherit;padding:4px 8px;border:2px solid #cfd3d8;border-radius:6px;min-width:0">'
+       + '<button class="abtn" onclick="event.stopPropagation();akcNazwaZapisz(' + k + ')">zapisz</button>'
+       + '<button class="abtn" onclick="event.stopPropagation();akcNazwaAnuluj()">anuluj</button></div>'
+       + '<div class="nota">Jak ten kanał nazywa się na obiekcie. Puste = nazwa fabryczna.</div>';
+}
+function akcNazwaKlawisz(e, k){ if (e.key === 'Enter') akcNazwaZapisz(k); if (e.key === 'Escape') akcNazwaAnuluj(); }
+function akcNazwaEdytuj(k){ AKC_NAZ_EDYT = k; srvRender(false);
+  setTimeout(() => { const i = document.getElementById('akcNazIn'); if (i) { i.focus(); i.select(); } }, 0); }
+function akcNazwaAnuluj(){ AKC_NAZ_EDYT = -1; srvRender(false); }
+function akcNazwaZapisz(k){
+  const i = document.getElementById('akcNazIn'); if (!i) return;
+  const t = i.value.trim();
+  const b = new TextEncoder().encode(t).length;
+  if (b > AKC_NAZWA_MAX_B){
+    pokazOdmowe('Nazwa za długa o ' + (b - AKC_NAZWA_MAX_B) + ' bajt' + (b - AKC_NAZWA_MAX_B === 1 ? '' : 'y')
+                + ' (limit ' + AKC_NAZWA_MAX_B + '; polska litera liczy się podwójnie)');
+    return;
+  }
+  if (!SRV_S.akc_naz) SRV_S.akc_naz = Array(16).fill('');
+  SRV_S.akc_naz[k] = t;                    /* od razu na ekranie; sterownik potwierdzi tematem nazw / rejestrami */
+  srvSlijNastawe('akc' + k + '_nazwa', t);
+  AKC_NAZ_EDYT = -1; srvRender(false);
+}
+
 function akcPrzelacz(k){
   SRV_S.akc_wl ^= (1 << k);
   srvRender(false);
@@ -8158,7 +8208,7 @@ function akcCzasEdytuj(k){
      rosnie o pozycje, ktorych na tej szafie nie ma */
   const n = (SRV_S.akc_nast && SRV_S.akc_nast[k]) || null;
   const klucz = 'akc' + k + '_czas';
-  EDY[klucz] = { et: 'Czas pracy — ' + AKC_NAZWY[k], j: 's', k: 30,
+  EDY[klucz] = { et: 'Czas pracy — ' + akcNazwa(k), j: 's', k: 30,
                  min: 30, max: 43200, dz: 0,
                  o: 'Po tylu sekundach kanał gaśnie sam. Naciśnięcie przycisku '
                   + 'w trakcie wyłącza go wcześniej — chyba że sposób działania '
@@ -8187,7 +8237,8 @@ function ekrAtrakcje(){
     w += `<div class="para" data-lv="para">
       <div class="mrow ${wl?'wl':''}" data-lv="p.akc${k}" onclick="akcPrzelacz(${k})">
         <span class="ptaszek">${PTASZEK}</span>
-        <span class="t">${AKC_NAZWY[k]}</span></div>
+        <span class="t">${akcNazwa(k)}</span></div>
+      ${akcNazwaWiersz(k)}
       <div class="mrow" data-lv="c.akc${k}_sposob" onclick="akcSposobPrzelacz(${k})">
         <span class="t">Sposób działania</span>
         <span class="w">${sposobTxt}</span><span class="ch">›</span></div>
@@ -8253,7 +8304,7 @@ function ekrPilot(){
   const hex = k => '0x' + (k >>> 0).toString(16).toUpperCase().padStart(6, '0');
   /* protokół [D-228c]: 100 = KeeLoq (piloty bram; kod = nr seryjny + przycisk, bez deszyfrowania), 1 = kod stały EV1527 */
   const protNazwa = (p, k) => p === 100 ? 'KeeLoq · nr ' + ((k >>> 4) >>> 0).toString(16).toUpperCase() + ' · przycisk ' + (k & 15) : 'kod stały';
-  const nazwa = k => (k >= 0 && k < 16) ? AKC_NAZWY[k % 8] + (k >= 8 ? ' (obieg 2)' : '') : '—';
+  const nazwa = k => (k >= 0 && k < 16) ? akcNazwa(k) + (k >= 8 ? ' (obieg 2)' : '') : '—';
   const kanaly = [];
   for (let k = 0; k < 16; k++) if ((SRV_S.akc_ist >> (k % 8)) & 1 && k < 8) kanaly.push(k);
   if (!p) return `<div class="tresc"><div class="nota" data-lv="nota">Czekam na rejestry pilota (3092+/4700+) — pod mostem albo ze strony sterownika.</div></div>` + pasek('SERWIS · pilot 433', 'serwis');
@@ -9769,7 +9820,7 @@ function zdTekst(w) {
   const [czas, kat, kod, zr, ob, a, b, c] = w;
   const obieg = ob === 255 ? '' : 'obieg ' + (ob + 1);   /* numer, nie nazwa - jedyny obieg = 1 [D-234], sadzawka to tez obieg 1 */
   const s16 = v => (v > 32767 ? v - 65536 : v), t10 = v => (s16(v) / 10).toFixed(1) + ' °C';
-  const kan = k => (k >= 0 && k < 16) ? (AKC_NAZWY[k % 8] || ('kanał ' + k)) + (k >= 8 ? ' (obieg 2)' : '') : 'kanał ' + k;
+  const kan = k => (k >= 0 && k < 16) ? akcNazwa(k) + (k >= 8 ? ' (obieg 2)' : '') : 'kanał ' + k;   /* własna nazwa [D-493] */
   const wl = b ? 'załączono' : 'wyłączono';
   /* sekundy po ludzku: 45 s · 5 min · 1 h 20 min [D-330] */
   const czasSl = s => s < 90 ? s + ' s'
@@ -9803,9 +9854,11 @@ function zdTekst(w) {
     case 14: return `lampa UV ${obieg}: ${b ? 'załączona' : 'wyłączona'}`;
     case 15: return `zatrzask pompy ${obieg}: ${b ? 'ZADZIAŁAŁ' : 'zwolniony'}` + (a ? ` (powód ${a === 1 ? 'za niskie ciśnienie' : a === 2 ? 'za wysokie ciśnienie' : a})` : '');
     case 16: return `START sterownika · ${ZD_START_POWOD[a] || 'powód ' + a} · firmware ${(c / 100).toFixed(2)}`;
+    case 17: return `przełącznik HOA ${obieg}: ${ZD_HOA[a] || a}` + (c !== a ? ` (było ${ZD_HOA[c] || c})` : '');   /* [D-492, B.0z-53] */
     case 20: { const nazwa = (typeof KATALOG_NAZWA === 'function') ? KATALOG_NAZWA(a) : null;
                return `nastawa ${nazwa || 'rejestr ' + a}: ${c === 0xFFFF ? '' : s16(c) + ' → '}${s16(b)}`; }
     case 21: return `sieć: ZASTOSUJ ${b ? 'przyjęte' : 'odrzucone'}`;
+    case 22: return `zmieniono nazwę kanału: ${kan(a)}`;   /* [D-493] */
     default: return `zdarzenie nr ${kod} (${a}, ${b}, ${c}) ${obieg}`;
   }
 }
@@ -10480,6 +10533,7 @@ if (PANEL_LEWY) {
                       mapa_do:'mapa_do', mapa_di:'mapa_di',
                       /* nastawy kanalow akcesoriow [2026-09-02] */
                       akc_nast:'akc_nast',
+                      akc_naz:'akc_naz',   /* własne nazwy kanałów [D-493] */
                       hist:'hist',   /* historia alarmów [D-156] */
                       zdarzenia:'zdarzenia',   /* dziennik zdarzeń [D-295] */
                       wodaAwaria:'wodaAwaria'};
