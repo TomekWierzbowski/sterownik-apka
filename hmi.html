@@ -155,6 +155,26 @@
   .hdr.harm .wstecz{width:62px;height:31px}
   .hdr.harm .wstecz svg{width:29px;height:29px}
   .hdr.harm .obj{font-size:24px}
+  /* DWA BLOCZKI ZAMIAST TYTULU [Tomasz 2026-09-25: „obok harmonogramu drugi bloczek - nazwijmy
+     go Alarmy i zdarzenia"]. Wybrany = czarne tlo i bialy tekst, drugi = bialy z szara ramka -
+     ten sam jezyk co paski okresu w dzienniku serwisu (.zdpas / .zdpas.akt), zeby „wybrane"
+     wygladalo tak samo w calym HMI. Ramka 2 px w OBU stanach: wybor zmienia kolor, nie wymiar
+     (wymiary stale przy zmiennej tresci). Szerokosc od tresci (flex 1 1 auto) - dluzszy napis
+     „alarmy i zdarzenia" dostaje wiecej, ale oba rosna, gdy jest luz. */
+  .hdr.harm .widoki{flex:1 1 auto;min-width:0;display:flex;gap:6px;margin-left:2px}
+  .hdr.harm .wid{flex:1 1 auto;min-width:0;height:31px;box-sizing:border-box;padding:0 7px;
+       display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;
+       border:2px solid #cfd3d8;border-radius:5px;background:#fff;color:#14161a;
+       font-size:15px;font-weight:750;letter-spacing:-.01em;white-space:nowrap;
+       overflow:hidden;text-overflow:ellipsis}
+  .hdr.harm .wid:active{background:#e9ebee}
+  .hdr.harm .wid.akt{border-color:#14161a;background:#14161a;color:#fff;cursor:default}
+  /* ALARMY I ZDARZENIA: ramka na tresc z menu serwisowego (klasa .srv - w sklejce caly arkusz
+     serwisu jest zakresowany pod nia, patrz zbuduj_hmi.py) */
+  .dzwidok{flex:1;min-height:0;display:flex;flex-direction:column}
+  .dzbrak{margin:28px 18px 0;font-size:14px;font-weight:600;color:#5d6470;text-align:center;line-height:1.45}
+  /* skrot z rozwinietej listy alarmow do historii - pod lista, przyklejony do lewej */
+  .alover .abtn.dzskrot{flex:0 0 auto;margin-top:7px;font-size:11px;letter-spacing:.02em}
 
   .grid{flex:1;display:flex;flex-direction:column;gap:14px;padding:16px 8px 8px;min-height:0}   /* szczeliny miedzy kaflami x2 (cien), do stopki bez zmian [Tomasz 2026-08-27] */
   /* alarm nakłada się dokładnie na kafel temperatury, niezależnie od układu */
@@ -1113,7 +1133,7 @@ body.serwis #hmi-pokaz .srvbox{display:block}
    startowa (pytania prompt() w aplikacji nie są). */
 if (!/[?&]mqtt=1(&|$)/.test(location.search)) location.replace('hmi.html?mqtt=1' + (location.search ? '&' + location.search.slice(1) : ''));
 try { if (!localStorage.getItem('odbior_mqtt')) location.replace('index.html?login=1'); localStorage.setItem('pwa', '1'); } catch (e) {}
-window.APKA_WERSJA = '71af939bca';
+window.APKA_WERSJA = 'c9312a4fcb';
 window.APKA_KLUCZ = '';
 if ('serviceWorker' in navigator) { var _odsw = false;
   document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible') return;
@@ -1605,7 +1625,7 @@ if ('serviceWorker' in navigator) { var _odsw = false;
 window.HMI_SKLEJONE = true;
 /* STEMPEL BUDOWANIA - strona ma mowic, kiedy powstala; bez tego
    pytanie „czy to juz po poprawce" rozstrzyga sie proba i domyslem. */
-window.HMI_ZBUDOWANO = '2026-09-24 13:26';
+window.HMI_ZBUDOWANO = '2026-09-25 10:35';
 </script>
 <script>
 /* ===== EKRANY UZYTKOWNIKA (panel4_hala.html, bez zmian) ===== */
@@ -2880,7 +2900,12 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
          scrolluje dopiero po przekroczeniu capu */
       return `<div class="alover roz ${wj}" style="height:auto;max-height:calc(100% - 16px);display:flex;flex-direction:column" onclick="alKlik()">
         <div class="rozh"><b>ALARMY (${n})</b>${strz}<span class="zw">▴</span></div>
-        <div id="alLista" style="overflow-y:auto;min-height:0">${ALARM_LISTA.map((x,k)=>wierszA(x,k)).join('')}</div></div>`;
+        <div id="alLista" style="overflow-y:auto;min-height:0">${ALARM_LISTA.map((x,k)=>wierszA(x,k)).join('')}</div>
+        ${/* SKROT DO HISTORII [Tomasz 2026-09-25: „Twoj uklad + skrot z paska"]: kto patrzy na
+              aktywne alarmy, zwykle chce tez wiedziec, co bylo wczesniej - bloczek „alarmy
+              i zdarzenia" przy harmonogramie, od razu na zakladce ALARMY. Pod lista, bo nie
+              nalezy do zadnej pozycji; stopPropagation, bo klik w pasek go zwija. */''}
+        <span class="abtn dzskrot" data-lv="alarm.historia" onclick="event.stopPropagation();dzZPaska()">historia alarmów i zdarzenia ›</span></div>`;
     }
     return '';   /* stan 'std' WYCOFANY [Tomasz 2026-08-13: 2 stany] */
   }
@@ -3082,8 +3107,16 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
   let _dotykDo = 0, _renderCzeka = null;
   document.addEventListener('pointerdown', () => { _dotykDo = Date.now() + 400; }, true);
   document.addEventListener('pointerup',   () => { _dotykDo = Date.now() + 250; }, true);
+  /* POLE DATY POD KURSOREM [2026-09-25]: bloczek „alarmy i zdarzenia" ma pola „od - do". Paczka
+     przychodzi kilka razy na sekunde, a render przepisuje ekran - pole powstawaloby od nowa pod
+     palcem i kalendarz przegladarki zamykal sie po pol sekundy. Ta sama zasada co `_srvPisze`
+     w serwisie; tylko pola NA EKRANIE (ptaszki symulacji obok urzadzenia tez sa <input>). */
+  function _halaPisze(){
+    const a = document.activeElement, s = el('screen');
+    return !!a && a.tagName === 'INPUT' && !!s && s.contains(a);
+  }
   function renderZPaczki(){
-    if (Date.now() < _dotykDo){
+    if (_halaPisze() || Date.now() < _dotykDo){
       if (!_renderCzeka)
         _renderCzeka = setTimeout(() => { _renderCzeka = null; renderZPaczki(); }, 120);
       return;
@@ -3094,12 +3127,16 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
   function render(){
     const _scr = el('screen');
     const _zap = (S.ekran === _przewEkran) ? _przewZapisz(_scr) : [];
-    const _koniec = () => { _przewWroc(_scr, _zap); _przewEkran = S.ekran; };
+    /* _dzOstatni [2026-09-25]: jak _przewEkran - ustawiany na KONCU, wiec budowa ekranu widzi
+       jeszcze POPRZEDNI stan i rozpoznaje wejscie na zakladke dziennika (ekranDziennik) */
+    const _koniec = () => { _przewWroc(_scr, _zap); _przewEkran = S.ekran;
+                            _dzOstatni = dzWidac() ? H.dzTab : null; };
     animujEkran();
     if (S.ekran==='kolor')       ekranKolor();
     else if (S.ekran==='temp')   ekranTemp();
     else if (S.ekran==='akc')    ekranAkc();
-    else if (S.ekran==='harm')   H.edy!==null ? ekranEdy() : ekranHarm();
+    else if (S.ekran==='harm')   H.edy!==null ? ekranEdy()
+                               : H.widok==='dziennik' ? ekranDziennik() : ekranHarm();
     else { ekranGlowny(); zegarHoldMontuj(); _koniec(); return; }  /* główny wstawia pasek u siebie */
     /* podekrany: BEZ paska alarmu - patrz komentarz wyżej */
     _koniec();
@@ -3174,7 +3211,7 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
        - z POMPA 2. Skoro klastry i tak sa osobne (kazdy wiruje wg swojej
        pompy), to niech kazdy prowadzi do siebie - zero szukania paska
        POMPA 1/2 po wejsciu. Przy jednej pompie bez zmian. */
-    const akcOtworz = t => `S.ekran='harm';H.tor=${t};H.edy=null;render()`;
+    const akcOtworz = t => `S.ekran='harm';H.widok='harm';H.tor=${t};H.edy=null;render()`;   /* z klastra pompy = zawsze harmonogram [2026-09-25] */
     const akcIko = nT>1
       ? `<span class="akcgrp" onclick="${akcOtworz(0)}">${klaster(0)}<i class="knr">1</i></span>`+
         `<span class="akcgrp" onclick="${akcOtworz(1)}">${klaster(1)}<i class="knr">2</i></span>`
@@ -3312,7 +3349,7 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
                  </div>
                  ${/* przy POSTOJU zero nie jest błędem — nie czerwienimy */''}
                  ${maMano2?`<div class="mman ${!stoi2 && cisZly(cis2)?'zle':''}"
-                      onclick="S.ekran='harm';H.tor=${i};H.edy=null;render()">
+                      onclick="S.ekran='harm';H.widok='harm';H.tor=${i};H.edy=null;render()">
                    <span class="wart"><b>${cisTxt(cis2)}</b><small>bar</small></span>${ikoMano(cis2)}</div>`:''}
                </div>`;
       }
@@ -3684,6 +3721,9 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
                   [[7,10],[17,22]],[[8,23]],[[8,23]]];
   const H = {
     tab:'filtracja', edy:null, tor:0,
+    /* BLOCZEK W NAGLOWKU [Tomasz 2026-09-25]: 'harm' = harmonogram, 'dziennik' = alarmy
+       i zdarzenia; dzTab = zakladka pod dziennikiem ('alarmy' | 'zdarzenia') */
+    widok:'harm', dzTab:'alarmy',
     /* NASTAWY PLUKANIA (tryb, prog, linia czystego zloza) NIE MIESZKAJA
        na panelu 4" [D Tomasz 2026-08-09] - hala dostaje alarmy i obsluge,
        opcje serwisowe siedza w HMI 7" technicznym przy szafie. */
@@ -3713,11 +3753,37 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
      dopasowac do ekranu, nie odwrotnie. */
   const dlug = w => ((w[1]-w[0]+24)%24) || 24;
 
+  /* NAGLOWEK EKRANU: STRZALKA + DWA BLOCZKI [Tomasz 2026-09-25: „dziennik zdarzen i historia
+     alarmow ladowac w obecnym harmonogram: na gorze, gdzie jest harmonogram (a pod spodem
+     filtracja i plukanie), obok harmonogramu drugi bloczek - nazwijmy go Alarmy i zdarzenia"]
+       WEJSCIA:  H.widok ('harm' | 'dziennik').
+       CO Z CZEGO WYNIKA: dawny sam tytul „harmonogram" staje sie jednym z dwoch bloczkow;
+                 wybrany jest czarny, drugi bialy z ramka i przelacza widok.
+       WYJSCIA:  pasek gorny wspolny dla obu widokow - strzalka powrotu zostaje po lewej.
+     ⚠ Jeden ekran (S.ekran = 'harm'), dwa widoki: wejscia z ekranu glownego (klaster pompy)
+       ustawiaja widok 'harm', skrot z paska alarmu - 'dziennik'.
+     ⚠ JAK NA PANELU (panel_tab5/panel_p4 ekran_alarmy.c: harm_naglowek) [recenzja 2026-09-25]:
+       wybrany bloczek NIE jest klikalny - jestesmy na nim (dawniej klik w niego przewijal widok
+       na gore, na panelu nie robi nic). */
+  function harmNaglowek(){
+    const dz = H.widok === 'dziennik';
+    return `<div class="hdr harm" style="order:0;border-top:0;border-bottom:1px solid #dcdcdc;background:#f2f2f2">
+        <span class="wstecz" onclick="S.ekran='glowny';render()">${IKO_WSTECZ}</span>
+        <div class="widoki">
+          <span class="wid${dz ? '' : ' akt'}" data-lv="bloczek.harmonogram"${dz ? ` onclick="harmWidok('harm')"` : ''}>harmonogram</span>
+          <span class="wid${dz ? ' akt' : ''}" data-lv="bloczek.alarmy"${dz ? '' : ` onclick="harmWidok('dziennik')"`}>alarmy i zdarzenia</span>
+        </div></div>`;
+  }
+  /* przelaczenie bloczka: zawsze lista (nie edytor), przewiniecie od gory - to inny widok,
+     a `render` przenosilby pozycje, bo ekran (S.ekran) jest ten sam.
+     ⚠ „alarmy i zdarzenia" otwiera ZAWSZE zakladke ALARMY - tak robi panel (ekran_alarmy.c: _do_alarm
+     -> eaz_zbuduj(EAZ_KAT_ALARMY)). Pamietanie ostatniej zakladki rozjezdzalo makiete z panelem
+     przy porownaniu sond [recenzja 2026-09-25]. */
+  function harmWidok(w){ H.widok = w; if (w === 'dziennik') H.dzTab = 'alarmy'; H.edy = null; _przewEkran = null; render(); }
+
   function ekranHarm(){
     const tab = H.tab, d2 = dwie();
-    let h = `<div class="hdr harm" style="order:0;border-top:0;border-bottom:1px solid #dcdcdc;background:#f2f2f2">
-        <span class="wstecz" onclick="S.ekran='glowny';render()">${IKO_WSTECZ}</span>
-        <span class="obj" style="margin:0 auto">harmonogram</span><span style="width:36px"></span></div>`;
+    let h = harmNaglowek();
 
     /* WYBOR TORU pojawia sie TYLKO gdy tory sa dwa - jedna pompa nie widzi
        przelacznika, ktorego nie potrzebuje. */
@@ -3840,6 +3906,63 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
        bo pozycja HOA byla wtedy tylko tutaj. */
     el('screen').innerHTML = h;
 
+  }
+
+  /* ---------- ALARMY I ZDARZENIA (drugi bloczek obok harmonogramu) ----------
+     [Tomasz 2026-09-25, wybrany wariant: „Twoj uklad + skrot z paska"]
+       WEJSCIA:  H.dzTab ('alarmy' | 'zdarzenia'); tresc tabel z menu serwisowego przez
+                 `window.DZIENNIK` (panel4_serwis.html) - dane ta sama droga co w serwisie:
+                 zapytanie `/okres` o karte sterownika, a bez karty pamiec od startu
+                 z pakietu swiata (`hist`, `zdarzenia`).
+       CO Z CZEGO WYNIKA: pod bloczkiem zakladki ALARMY | ZDARZENIA w stylu FILTRACJA | PLUKANIE;
+                 pod nimi paski okresu, (w ZDARZENIACH) ptaszki kategorii, tabela od najnowszego
+                 i stopka z „odswiez" - 1:1 z serwisem, bez PIN-u (to jest odczyt).
+       WYJSCIA:  ekran; `dzZPaska()` - wejscie z rozwinietej listy alarmow, od razu na ALARMACH.
+
+     ⚠ JEDNO ZRODLO TRESCI. Tabele rysuje serwis (`DZIENNIK.tresc`), tu jest tylko rama. Dwie kopie
+       rozjechalyby sie przy pierwszej poprawce - dokladnie to spotkalo dziennik i historie alarmow
+       w serwisie, zanim dostaly wspolny `okresPaski` [D-346].
+     ⚠ HALA OTWARTA SAMA (albo w ramce DUO) nie ma serwisu w tym samym dokumencie - `window.DZIENNIK`
+       nie istnieje i ekran pokazuje note zamiast sie wysypac. Tabela zyje w pelnym HMI
+       (panel4_hmi.html), czyli tam, gdzie jest panel, most i strona sterownika.
+     ⚠ RAMKA Z KLASA `srv`: w sklejce CALY arkusz serwisu jest zakresowany pod `.srv`
+       (zbuduj_hmi.py) - bez tej klasy tabela bylaby golym HTML-em. */
+  let _dzOstatni = null;       /* zakladka narysowana ostatnio (null = widok nie byl na ekranie); ustawia render */
+  let _dzZgloszony = false, _dzRysCzeka = null;
+  function dzWidac(){ return S.ekran === 'harm' && H.widok === 'dziennik' && H.edy === null; }
+  function dzZakl(t){ H.dzTab = t; _przewEkran = null; render(); }
+  function dzZPaska(){ S.ekran = 'harm'; H.widok = 'dziennik'; H.dzTab = 'alarmy'; H.edy = null; render(); }
+  function ekranDziennik(){
+    const D = window.DZIENNIK, t = H.dzTab;
+    let h = harmNaglowek();
+    h += `<div class="tabs">
+        <div class="${t==='alarmy'?'sel':''}" data-lv="taby.alarmy" onclick="dzZakl('alarmy')">ALARMY</div>
+        <div class="${t==='zdarzenia'?'sel':''}" data-lv="taby.zdarzenia" onclick="dzZakl('zdarzenia')">ZDARZENIA</div>
+      </div>`;
+    if (!D || typeof D.tresc !== 'function'){
+      h += `<div class="dzbrak" data-lv="dziennik.nota">${t === 'alarmy' ? 'Historia alarmów' : 'Dziennik zdarzeń'} —<br>dane dostępne w pełnym HMI.</div>`;
+      el('screen').innerHTML = h;
+      return;
+    }
+    /* ZGLOSZENIE DO PRZERYSOWAN: odpowiedz karty przychodzi po czasie, a zmiana okresu i ptaszka
+       dzieje sie w funkcjach serwisu - bez zgloszenia przerysowalby sie tylko (schowany) serwis.
+       Rysowanie ODKLADANE do konca biezacego: prosba „glosna" rysuje od razu, czyli czesto
+       z wnetrza tego samego `render` - zagniezdzony render nadpisalby ekran w pol budowy. */
+    if (!_dzZgloszony && typeof D.widok === 'function'){
+      _dzZgloszony = true;
+      D.widok({ widac: dzWidac, rysuj: () => {
+        if (_dzRysCzeka) return;
+        _dzRysCzeka = setTimeout(() => { _dzRysCzeka = null; if (dzWidac()) render(); }, 0);
+      } });
+    }
+    /* WEJSCIE = pierwsze rysowanie tej zakladki po przyjsciu - wtedy serwis sam dociaga ostatnie
+       24 h [D-346]; kolejne rysowania z paczki ze sterownika nie pytaja karty o nic */
+    const wejscie = _dzOstatni !== t;
+    let tr;
+    try { tr = D.tresc(t, wejscie); }
+    catch(e){ tr = `<div class="nota" data-lv="nota">dziennik: błąd rysowania — ${e && e.message ? e.message : e}</div>`; }
+    h += `<div class="srv dzwidok" data-lv="dziennik"><div class="tresc">${tr}</div></div>`;
+    el('screen').innerHTML = h;
   }
 
   function ekranEdy(){
@@ -5292,8 +5415,12 @@ window.HMI_ZBUDOWANO = '2026-09-24 13:26';
     /* BEZ CHEMII = bloczek HOA + manometr na gorze [inwentarz pod siatke
        LVGL, 2026-08-26]; stan stanowiska (obieg bez celi) */
     ['glowny-hoa',    () => { S.ekran='glowny'; el('b_chem').checked=false; }],
-    ['harm-filtracja',() => { S.ekran='harm'; H.tab='filtracja'; H.edy=null; }],
-    ['harm-plukanie', () => { S.ekran='harm'; H.tab='plukanie';  H.edy=null; }],
+    ['harm-filtracja',() => { S.ekran='harm'; H.widok='harm'; H.tab='filtracja'; H.edy=null; }],
+    ['harm-plukanie', () => { S.ekran='harm'; H.widok='harm'; H.tab='plukanie';  H.edy=null; }],
+    /* bloczek „alarmy i zdarzenia" [2026-09-25] - w hali otwartej samej sama rama + nota
+       (tresc tabel zyje w serwisie, patrz ekranDziennik) */
+    ['harm-alarmy',   () => { S.ekran='harm'; H.widok='dziennik'; H.dzTab='alarmy';    H.edy=null; }],
+    ['harm-zdarzenia',() => { S.ekran='harm'; H.widok='dziennik'; H.dzTab='zdarzenia'; H.edy=null; }],
     ['temp',          () => { S.ekran='temp'; }],
     ['kolor',         () => { S.ekran='kolor'; }],
     ['akc',           () => { S.ekran='akc'; }]
@@ -9909,24 +10036,44 @@ const OKRES_UI = { zdarzenia: { od: null, dok: null, linie: null, laduje: false,
     ⚠ Adres `data-lv` jest OSOBNY per ekran (c.zdtryb / c.almtryb) - to dwa rozne przelaczniki
     w panelu, mimo ze srvRender maja wspolny. */
 const OKRES_TRYB = { zdarzenia: '24h', alarmy: '24h' };     /* '24h' | 'zakres' */
+/*  KTO POKAZUJE DZIENNIK I HISTORIE ALARMOW [Tomasz 2026-09-25: „dziennik zdarzen i historia alarmow
+    ladowac w obecnym harmonogram ... obok harmonogramu drugi bloczek - Alarmy i zdarzenia"]
+    ------------------------------------------------------------
+    WEJSCIA:  widoki, ktore rysuja tabele dziennika. Dzis dwa: to menu serwisowe (ekrany `zdarzenia`
+              i `historia`) oraz ekran uzytkownika - bloczek „alarmy i zdarzenia" przy harmonogramie
+              (panel4_hala.html, zglasza sie sam przy pierwszym rysowaniu). Kazdy daje dwie rzeczy:
+              `widac()` - czy tabela jest teraz na ekranie, `rysuj(anim)` - przerysuj.
+    CO Z CZEGO WYNIKA: odpowiedz `/okres`, zmiana okresu i ptaszek kategorii przerysowuja TYLKO widoki,
+              ktore tabele teraz pokazuja.
+    WYJSCIA:  `dzRysuj(anim)` - w miejsce dawnych wywolan `srvRender()` w funkcjach okresu.
+
+    PO CO: do 25.09 funkcje okresu wolaly wprost `srvRender()` serwisu i pytaly o `SRV_S.ekran` serwisu.
+    Na ekranie uzytkownika przerysowalby sie wtedy SCHOWANY serwis, a widoczna tabela stalaby
+    na „szukam na karcie..." do nastepnej paczki - czyli milczaca odmowa (zasada 10).
+    ⚠ Dla serwisu nic sie nie zmienia: `widac` to dokladnie ten warunek, ktory stal wczesniej
+    w odpowiedzi `/okres`, a `rysuj` to ten sam `srvRender` z tym samym argumentem. */
+const DZ_WIDOKI = [];
+function dzWidok(w) { DZ_WIDOKI.push(w); }
+function dzRysuj(anim) { DZ_WIDOKI.forEach(w => { if (w.widac()) w.rysuj(anim); }); }
+dzWidok({ widac: () => SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia', rysuj: a => srvRender(a) });
 function okresWybierz(kat, tryb) {
   OKRES_TRYB[kat] = tryb;
   if (tryb === '24h') { const u = OKRES_UI[kat]; if (!u.laduje) kartaOkresOstatnie(kat, 24); }
-  else srvRender();
+  else dzRysuj();
 }
 function okresPaski(kat) {
   const u = OKRES_UI[kat], tr = OKRES_TRYB[kat], adr = (kat === 'alarmy') ? 'c.almtryb' : 'c.zdtryb';
   return `<div class="zdpas${tr === '24h' ? ' akt' : ''}" data-lv="${adr}" onclick="okresWybierz('${kat}','24h')"><span class="zdpas-t">Rejestr · ostatnie 24 h</span></div>`
        + `<div class="zdpas${tr === 'zakres' ? ' akt' : ''}" data-lv="${adr}" onclick="okresWybierz('${kat}','zakres')"><span class="zdpas-t">Rejestr · od – do</span>${
            tr === 'zakres'
-             ? `<span class="zdzakres" onclick="event.stopPropagation()"><input type="date" id="okres-od-${kat}" value="${u.odTxt || ''}"> – <input type="date" id="okres-do-${kat}" value="${u.doTxt || ''}"> <span class="abtn" data-lv="abtn" onclick="kartaOkresPola('${kat}')">pokaż</span></span>`
+             ? `<span class="zdzakres" onclick="event.stopPropagation()"><input type="date" id="okres-od-${kat}" value="${u.odTxt || ''}"> – <input type="date" id="okres-do-${kat}" value="${u.doTxt || ''}"> <span class="abtn" data-lv="abtn" onclick="kartaOkresPola('${kat}',this)">pokaż</span></span>`
              : `<span class="zdpas-i">${u.odTxt && u.doTxt ? u.odTxt + ' – ' + u.doTxt : 'tapnij, podaj daty'}</span>`}</div>`;
 }
 function okresStopka(kat) {
   const u = OKRES_UI[kat];
   return `<div class="nota" data-lv="nota" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
       ${u.linie ? `<span class="abtn" data-lv="abtn" onclick="kartaOkresPobierz('${kat}')">pobierz CSV</span>` : ''}
-      ${!u.laduje ? `<span class="abtn" data-lv="abtn" onclick="${OKRES_TRYB[kat] === '24h' ? `kartaOkresOstatnie('${kat}',24)` : `kartaOkresPola('${kat}')`}">odśwież</span>`
+      ${!u.laduje ? `<span class="abtn" data-lv="abtn" onclick="${OKRES_TRYB[kat] === '24h' ? `kartaOkresOstatnie('${kat}',24)` : `kartaOkresPola('${kat}',this)`}">odśwież</span>`
                   : `<span class="zdpas-i">odświeżam…</span>`}</div>`;
 }
 /*  OSTATNIE 24 h SAME, PRZY KAZDYM WEJSCIU [D-346, Tomasz 2026-09-12: „chodzi o to, zeby jak wejde
@@ -9946,11 +10093,14 @@ function okresStopka(kat) {
     ⛔ NIE PONAWIAMY W KOLKO PRZY BLEDZIE. Sadzawka nie ma karty i odpowiada bledem; gdyby warunek
     pytal mimo bledu przy kazdym renderze, apka pytalaby kilka razy na sekunde w nieskonczonosc.
     Po bledzie probujemy PONOWNIE DOPIERO PRZY NASTEPNYM WEJSCIU na ekran - czlowiek, ktory wraca,
-    dostaje swieza probe, a ekran zostawiony otwarty nie dobija lacza. */
-function okresAuto(kat) {
+    dostaje swieza probe, a ekran zostawiony otwarty nie dobija lacza.
+    ⚠ `wejscie` PODAJE WIDOK SPOZA SERWISU [2026-09-25]. Ekran uzytkownika (bloczek „alarmy
+    i zdarzenia" przy harmonogramie) ma wlasny `srvRender` i wlasny poprzedni ekran - `SRV__przewEkran`
+    serwisu nic o nim nie wie. Bez argumentu liczymy jak dotad, z ekranow serwisu. */
+function okresAuto(kat, wejscieZ) {
   const u = OKRES_UI[kat];
   if (OKRES_TRYB[kat] !== '24h' || u.laduje) return;      /* zakres wybral czlowiek - nie nadpisujemy */
-  const wejscie = (SRV_S.ekran !== SRV__przewEkran);
+  const wejscie = (wejscieZ !== undefined) ? wejscieZ : (SRV_S.ekran !== SRV__przewEkran);
   if (u.linie === null) { if (!u.blad || wejscie) kartaOkresOstatnie(kat, 24); return; }
   if (wejscie && Date.now() - (u.kiedy || 0) > 20000) kartaOkresOstatnie(kat, 24, true);
 }
@@ -9970,13 +10120,17 @@ function kartaOkres(kat, od, dok, etyk, cicho) {
   setTimeout(() => {
     if (u.laduje && u.nr === nr) {
       u.laduje = false; u.blad = 'sterownik nie odpowiedział (karta / łącze)';
-      if (SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia') srvRender(false);
+      dzRysuj(false);
     }
   }, OKRES_LIMIT_MS);
-  if (!cicho) { u.linie = null; srvRender(); }
+  /*  [2026-09-25] przerysowanie przez `dzRysuj` - tylko widoki, ktore TERAZ pokazuja tabele (serwis albo
+      bloczek „alarmy i zdarzenia" ekranu uzytkownika). Dawne `!cicho || SRV_S.ekran === ...` rysowalo przy
+      glosnej prosbie takze ekran, na ktory czlowiek zdazyl juz przejsc - cudzy ekran (np. PIN pod palcem)
+      i tak nie mial czego pokazac z tej odpowiedzi. */
+  if (!cicho) { u.linie = null; dzRysuj(); }
   fetch('/okres?kat=' + kat + '&od=' + od + '&do=' + dok).then(r => r.json())
-    .then(o => { u.laduje = false; if (o.blad) u.blad = o.blad; else { u.linie = (o.linie || []).map(l => l.split(';').map(Number)); u.kiedy = Date.now(); } if (!cicho || SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia') srvRender(false); })
-    .catch(e => { u.laduje = false; u.blad = String(e); if (!cicho || SRV_S.ekran === 'zdarzenia' || SRV_S.ekran === 'historia') srvRender(false); });   /* cicho: nie przerysowuj cudzego ekranu (np. PIN pod palcem) */
+    .then(o => { u.laduje = false; if (o.blad) u.blad = o.blad; else { u.linie = (o.linie || []).map(l => l.split(';').map(Number)); u.kiedy = Date.now(); } dzRysuj(false); })
+    .catch(e => { u.laduje = false; u.blad = String(e); dzRysuj(false); });   /* cicho: nie przerysowuj cudzego ekranu (np. PIN pod palcem) */
 }
 function kartaOkresOstatnie(kat, godzin, cicho) {
   /* „teraz" ze zegara sterownika (blok) - telefon może mieć inną strefę; zapas 5 min w przód */
@@ -10006,8 +10160,13 @@ function zdWczytajOdStartu(nowe) {
   }
   if (nowe && OKRES_TRYB.zdarzenia === '24h' && u.linie && !u.laduje && Date.now() - (u.kiedy || 0) > 20000) kartaOkresOstatnie('zdarzenia', 24, true);
 }
-function kartaOkresPola(kat) {
-  const a = document.getElementById('okres-od-' + kat), b = document.getElementById('okres-do-' + kat);
+/*  POLA DATY SZUKANE OBOK PRZYCISKU [2026-09-25]: w sklejonym HMI te same pola (`okres-od-alarmy` ...)
+    moga stac naraz na dwoch ekranach - w schowanym serwisie i w bloczku „alarmy i zdarzenia" ekranu
+    uzytkownika. `getElementById` bralby pierwsze w dokumencie, czyli czasem pola z ekranu, ktorego nie
+    widac. Szukamy wiec w tej samej ramce `.tresc`, w ktorej nacisnieto „pokaz"/„odswiez". */
+function kartaOkresPola(kat, przycisk) {
+  const r = (przycisk && przycisk.closest && przycisk.closest('.tresc')) || document;
+  const a = r.querySelector('#okres-od-' + kat), b = r.querySelector('#okres-do-' + kat);
   if (!a || !a.value || !b || !b.value) { alert('podaj obie daty'); return; }
   OKRES_UI[kat].odTxt = a.value; OKRES_UI[kat].doTxt = b.value;
   const od = Math.floor(new Date(a.value + 'T00:00:00Z').getTime() / 1000), dok = Math.floor(new Date(b.value + 'T23:59:59Z').getTime() / 1000);
@@ -10031,10 +10190,19 @@ function kartaOkresPobierz(kat) {
    pamięć od startu (RAM) z notą. Ptaszki = trzy kategorie z 14b (użytkownik / automat / konfiguracja).
    ============================================================ */
 const zdKatWl = { 1: true, 2: true, 3: true };
-function zdPrzelaczKat(k) { zdKatWl[k] = !zdKatWl[k]; srvRender(); }
+function zdPrzelaczKat(k) { zdKatWl[k] = !zdKatWl[k]; dzRysuj(); }   /* [2026-09-25] kazdy widok z tabela, nie tylko serwis */
 /*  [D-346] `zdTryb` i `zdWybierz` ZASTAPIONE przez wspolne `OKRES_TRYB.zdarzenia` i `okresWybierz` -
     ten sam przelacznik obsluguje teraz dziennik i historie alarmow. */
-function ekrZdarzenia(){
+/*  TRESC BEZ RAMKI EKRANU [2026-09-25, bloczek „alarmy i zdarzenia" na ekranie uzytkownika]
+    ------------------------------------------------------------
+    WEJSCIA:  `wejscie` - czy to pierwsze rysowanie po wejsciu na widok (podaje ekran uzytkownika;
+              serwis zostawia puste i liczy jak dotad z `SRV__przewEkran`).
+    CO Z CZEGO WYNIKA: paski okresu, ptaszki kategorii, tabela, noty i stopka - wszystko, co jest
+              dziennikiem, a nie ekranem serwisu.
+    WYJSCIA:  HTML do wlozenia w ramke `.tresc`. Pasek dolny serwisu dokleja `ekrZdarzenia`, ekran
+              uzytkownika ma wlasny naglowek (`window.DZIENNIK`, nizej).
+    ⚠ Tresc ma JEDNO zrodlo - te funkcje. Ekran uzytkownika jej nie kopiuje, tylko wola. */
+function dzZdarzeniaTresc(wejscie){
   /*  UKŁAD 2 [Tomasz 2026-09-10 17:30]: góra ma być WĄSKA i czytelna, bo najważniejsza jest tabela pod spodem.
       Dwa wąskie paski: „Rejestr · ostatnie 24 h" i „Rejestr · od–do" (daty pokazują się po tapnięciu w pasek),
       wybrany = podświetlona ramka; pod nimi trzy wąskie ptaszki kategorii; tabela z numerem od najnowszego. */
@@ -10042,7 +10210,7 @@ function ekrZdarzenia(){
   const kiedy = t => { if (!t || t < 1735689600) return '— —'; const m = new Date(t * 1000);
       return p2(m.getUTCDate()) + '.' + p2(m.getUTCMonth() + 1) + ' ' + p2(m.getUTCHours()) + ':' + p2(m.getUTCMinutes()) + ':' + p2(m.getUTCSeconds()); };
   if (window.MOST_JS && MOST_JS.prosZdarzenia) MOST_JS.prosZdarzenia();
-  okresAuto('zdarzenia');   /* [D-346] wspolna regula: 24 h same przy wejsciu, bez dobijania przy bledzie */
+  okresAuto('zdarzenia', wejscie);   /* [D-346] wspolna regula: 24 h same przy wejsciu, bez dobijania przy bledzie */
   const teraz = (SRV_S.czasSter || Math.floor(Date.now() / 1000));
   /* stopki z liczbą wpisów i źródłem NIE MA [Tomasz 2026-09-10 23:10: „tego wpisu nie generuj”] - numer w tabeli mówi, ile jest */
   let wiersze = null;
@@ -10050,7 +10218,7 @@ function ekrZdarzenia(){
   else if (z && z.wpisy) wiersze = z.wpisy.filter(x => OKRES_TRYB.zdarzenia !== '24h' || x[0] >= teraz - 86400);   /* bez karty (albo karta jeszcze nie odpowiedziała): pamięć od startu - tabela nie znika na czas cichego odświeżenia [D-308] */
   const pokaz = wiersze ? wiersze.filter(x => zdKatWl[x[1]]) : null;
   const ptaszek = (k, et) => `<div class="mrow zdmini ${zdKatWl[k] ? 'wl' : ''}" data-lv="p.zdkat${k}" onclick="zdPrzelaczKat(${k})"><span class="ptaszek">${PTASZEK}</span><span class="t">${et}</span></div>`;
-  return `<div class="tresc">
+  return `
     ${okresPaski('zdarzenia')}
     <div class="zdkaty">${ptaszek(1, 'Użytkownik')}${ptaszek(2, 'Zdarzenia cykliczne')}${ptaszek(3, 'Zmiany w konfiguracji')}</div>
     ${u.laduje && !pokaz ? `<div class="nota" data-lv="nota">szukam na karcie…</div>`
@@ -10062,10 +10230,14 @@ function ekrZdarzenia(){
     ${pokaz ? `<div class="nota" data-lv="nota">${(u.linie && !u.blad) ? `${u.etyk} · z karty sterownika`
                                                   : 'pamięć sterownika od startu (restart ją kasuje)'}</div>` : ''}
     ${u.blad && !u.laduje ? `<div class="nota" data-lv="nota">karta: ${u.blad}</div>` : ''}
-    ${okresStopka('zdarzenia')}
-  </div>` + pasek('SERWIS · dziennik zdarzeń', 'serwis');
+    ${okresStopka('zdarzenia')}`;
 }
-function ekrHistoria(){
+function ekrZdarzenia(){
+  return `<div class="tresc">${dzZdarzeniaTresc()}</div>` + pasek('SERWIS · dziennik zdarzeń', 'serwis');
+}
+/*  TRESC BEZ RAMKI EKRANU [2026-09-25] - jak `dzZdarzeniaTresc` wyzej: jedno zrodlo historii alarmow
+    dla menu serwisowego i dla zakladki ALARMY ekranu uzytkownika. */
+function dzHistoriaTresc(wejscie){
   /* PRZY ŻYWYM MODULE NIE POKAZUJEMY LISTY DEMO [D-153]: historia żyje w RAM
      sterownika i panel czyta ją komendą 12 (blok 220+); most tej drogi nie ma.
      Demo zostaje tylko na biurku, gdzie nie ma czego pomylić. */
@@ -10101,14 +10273,14 @@ function ekrHistoria(){
         ⚠ EPIZODY, NIE PODNIESIENIA [D-308]: `almSklej` skleja alarm odbijajacy w jeden wiersz
         z czasem PIERWSZEGO wystapienia i liczba powtorzen - inaczej jeden migoczacy alarm zjadal
         cala liste. Kolumna „powt." niesie te liczbe. */
-    okresAuto('alarmy');
+    okresAuto('alarmy', wejscie);
     const u = OKRES_UI.alarmy;
     const zKarty = (u.linie && !u.blad) ? epizody(u.linie) : null;
     const zRam = almSklej(((h && h.wpisy) ? h.wpisy : []).filter(x => x[1]).map(x => ({ bit: x[0], czas: x[2] }))).slice(0, 50);
     const w = zKarty || ((h && h.wpisy) ? zRam : null);
     const zrodlo = zKarty ? `${u.etyk} · z karty sterownika`
                  : `pamięć sterownika od startu (restart ją kasuje)${h && h.zgubione ? ' · utraconych: ' + h.zgubione : ''}`;
-    return `<div class="tresc">
+    return `
       ${okresPaski('alarmy')}
       ${u.laduje && !w ? `<div class="nota" data-lv="nota">szukam na karcie…</div>`
         : !w ? `<div class="nota" data-lv="nota">${OKRES_TRYB.alarmy === 'zakres' ? 'podaj zakres i naciśnij „pokaż"' : 'czekam na dane…'}</div>`
@@ -10118,8 +10290,7 @@ function ekrHistoria(){
           + `</tbody></table></div>`}
       ${w ? `<div class="nota" data-lv="nota">${zrodlo}</div>` : ''}
       ${u.blad && !u.laduje ? `<div class="nota" data-lv="nota">karta: ${u.blad}</div>` : ''}
-      ${okresStopka('alarmy')}
-    </div>` + pasek('SERWIS · historia alarmów', 'serwis');
+      ${okresStopka('alarmy')}`;
   }
   const wpisy = [
     ['wt 18.08 06:12','E2','Płukanie przerwane / niewykonane — podpowiedź 17: brak ubytku wody, sprawdź głowicę płuczącą'],
@@ -10128,15 +10299,38 @@ function ekrHistoria(){
     ['nd 16.08 03:40','F1','Zabezpieczenie termiczne! Sprawdź pompę filtracji 1'],
     ['nd 16.08 03:52','—','Termik wrócił — alarm zgasł sam'],
   ];
-  return `<div class="tresc">
+  return `
     <div class="nota" data-lv="nota">Historia leży w pamięci ulotnej modułu — <b>restart ją
     kasuje</b>. Trwała historia = zapis na kartę SD (osobne zadanie).</div>
     ${wpisy.map(w => `<div class="hrow">
       <div class="k"><b>${w[0]}</b><span>${w[1]}</span></div>
       <div class="t">${w[2]}</div></div>`).join('')}
-    <div class="nota" data-lv="nota">wpisów: 5 · utraconych: 0</div>
-  </div>` + pasek('SERWIS · historia alarmów', 'serwis');
+    <div class="nota" data-lv="nota">wpisów: 5 · utraconych: 0</div>`;
 }
+function ekrHistoria(){
+  return `<div class="tresc">${dzHistoriaTresc()}</div>` + pasek('SERWIS · historia alarmów', 'serwis');
+}
+
+/* ===== DZIENNIK DLA EKRANU UZYTKOWNIKA [Tomasz 2026-09-25] ================
+   WEJSCIA:  zakladka ('alarmy' | 'zdarzenia') i znacznik wejscia - od ekranu uzytkownika
+             (panel4_hala.html, bloczek „alarmy i zdarzenia" obok harmonogramu).
+   CO Z CZEGO WYNIKA: te same funkcje, ktore rysuja ekrany serwisu - ten sam okres, te same
+             ptaszki, ta sama tabela i ta sama droga danych (`/okres`, pakiet swiata `hist`
+             i `zdarzenia`). Bez PIN-u: to jest odczyt, zadna nastawa tu nie mieszka.
+   WYJSCIA:  `window.DZIENNIK.tresc(kat, wejscie)` - HTML do ramki `.tresc`;
+             `window.DZIENNIK.widok({widac, rysuj})` - zgloszenie widoku do przerysowan (`dzRysuj`).
+
+   ⚠ DLACZEGO PRZEZ `window`, A NIE PO NAZWIE. Hala i serwis sa sklejane w jeden dokument
+     (zbuduj_hmi.py) i czesc globali serwisu jest tam PRZEMIANOWYWANA (`SRV_S` -> `SRV_S`, `srvRender` ->
+     `srvRender`...). Hala nie moze wiec polegac na nazwach serwisu - a wlasnosc obiektu `window`
+     zostaje taka, jaka jest. Hala otwarta SAMA (bez serwisu) albo w ramce DUO widzi brak obiektu
+     i pokazuje note zamiast sie wysypac.
+   ⚠ Stan (okres, ptaszki kategorii, odpowiedz karty) jest WSPOLNY z menu serwisowym - to jeden
+     dziennik jednego sterownika, nie dwa. */
+window.DZIENNIK = {
+  tresc: (kat, wejscie) => kat === 'alarmy' ? dzHistoriaTresc(wejscie) : dzZdarzeniaTresc(wejscie),
+  widok: dzWidok,
+};
 
 /* ===== EDYTOR NASTAWY ================================================== */
 function edytuj(klucz){
